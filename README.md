@@ -19,6 +19,28 @@ following musical features:
 brew install wget
 ```
 
+Download and install musescore (for visualising ABC with music21)
+https://musescore.org/en/download. I then needed to create a shortcut for music21 to
+find my copy of MuscScore:
+```bash
+ln -s /Applications/MuseScore\ 3.5.app /Applications/MuseScore\ 3.app
+```
+
+Then run the following:
+```python
+from music21 import *
+confgigure.run()
+```
+
+Also, make sure you open MuseScore and accept the query box first, else you'll get
+errors in the notebook e.g.
+```bash
+dlopen error : dlopen(/usr/local/lib/libjack.0.dylib, 1): image not found
+Creating main window…
+ZoomBox::setLogicalZoom(): Formatting logical zoom level as 100% (rounded from 1.000000)
+Reading translations…
+```
+
 ### Python environment
 ```bash
 conda create -n dj-gen python=3.8 black flake8 isort jupyterlab matplotlib numpy \
@@ -27,6 +49,7 @@ conda activate dj-gen
 conda install pytorch torchvision -c pytorch
 conda install -c conda-forge pre-commit
 # conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
+pip install music21
 ```
 
 ### Get data
