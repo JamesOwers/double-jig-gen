@@ -12,6 +12,7 @@ before_install:
   - python --version
 install:
   - pip install .
+  - pip install codecov  # only required for `after_success`
 # command to run tests - the required packages, pytest-runner, pytest, and pytest-cov
 # are installed as configured in setup.cfg under setup_requires and tests_require
 script:
