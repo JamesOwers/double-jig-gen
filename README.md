@@ -1,4 +1,18 @@
-# Double Jig Generation
+[build-image]: https://travis-ci.com/JamesOwers/double-jig-gen.svg?branch=master
+[build-url]: https://travis-ci.com/JamesOwers/double-jig-gen
+[coverage-image]: https://codecov.io/gh/JamesOwers/double-jig-gen/branch/master/graph/badge.svg
+[coverage-url]: https://codecov.io/github/JamesOwers/double-jig-gen?branch=master
+<!-- [docs-image]: https://readthedocs.org/projects/midi_degradation_toolkit/badge/?version=latest
+[docs-url]: https://midi_degradation_toolkit.readthedocs.io/en/latest/?badge=latest
+[pypi-image]: https://badge.fury.io/py/midi_degradation_toolkit.svg
+[pypi-url]: https://pypi.python.org/pypi/midi_degradation_toolkit -->
+
+# `double_jig_gen` - Double Jig Folk Music Generation
+
+[![Build Status][build-image]][build-url]
+[![Code Coverage][coverage-image]][coverage-url]
+<!-- [![PyPI Version][pypi-image]][pypi-url] -->
+<!-- [![Docs Status][docs-image]][docs-url] -->
 
 My entry for the AI Music Generation Challenge 2020 at The 2020 Joint Conference on AI
 Music Creativity <https://boblsturm.github.io/aimusic2020/>
@@ -19,17 +33,24 @@ following musical features:
 brew install wget
 ```
 
-Download and install musescore (for visualising ABC with music21)
-https://musescore.org/en/download. I then needed to create a shortcut for music21 to
-find my copy of MuscScore:
+### Python environment
 ```bash
-ln -s /Applications/MuseScore\ 3.5.app /Applications/MuseScore\ 3.app
+conda create -y -n dj-gen python=3.8
+conda activate dj-gen
+# pip install .
+pip install -e ".[dev]"
+# TODO: auto install correct pytorch for given platform
+pip install torch torchvision
+# pip install torch==1.6.0+cu101 torchvision==0.7.0+cu101 \
+#     -f https://download.pytorch.org/whl/torch_stable.html
 ```
+
+### Configure Music21
 
 Then run the following:
 ```python
-from music21 import *
-confgigure.run()
+from music21 import configure
+configure.run()
 ```
 
 Also, make sure you open MuseScore and accept the query box first, else you'll get
@@ -39,17 +60,6 @@ dlopen error : dlopen(/usr/local/lib/libjack.0.dylib, 1): image not found
 Creating main window…
 ZoomBox::setLogicalZoom(): Formatting logical zoom level as 100% (rounded from 1.000000)
 Reading translations…
-```
-
-### Python environment
-```bash
-conda create -n dj-gen python=3.8 black flake8 isort jupyterlab matplotlib numpy \
-    pandas pre-commit pylint pytest seaborn tqdm
-conda activate dj-gen
-conda install pytorch torchvision -c pytorch
-conda install -c conda-forge pre-commit
-# conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
-pip install music21
 ```
 
 ### Get data
