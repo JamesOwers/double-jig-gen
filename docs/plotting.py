@@ -135,7 +135,7 @@ def plot_freq(
     title: Union[str, bool, None] = None,
     tr_spines: bool = False,
     kind: str = "pct",
-    **get_percentile_from_freq_kwargs: Mapping[Any, Any],
+    **get_percentile_from_freq_kwargs,
 ) -> pd.Series:
     """Plots pd.Series frequency counts.
 
