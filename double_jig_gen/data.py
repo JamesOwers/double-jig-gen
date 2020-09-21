@@ -1,6 +1,6 @@
 """Dataset preprocessing and item getting classes."""
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Collection, List, Optional, Sequence, Tuple, Union
 
 from torch.utils.data import DataLoader
 
@@ -21,17 +21,31 @@ class ABCDataset:
 
     """
 
-    def __init__(self, filepath: PATHLIKE,) -> None:
+    def __init__(
+        self,
+        filepath: Optional[PATHLIKE] = None,
+        tunes: Optional[List[str]] = None,
+        tokens: Optional[Collection[str]] = None,
+    ) -> None:
         """Initialises class.
 
         Args:
             filepath: path to the file containing the ABC data.
         """
-        self._filepath = filepath
-        self.data = read_and_rstrip_file(filepath)
-        self.tokens = set(self.data.split())
+        if tunes is None:
+            self._filepath = filepath
+            self.data = read_and_rstrip_file(filepath)
+            self.tunes = self.data.split("\n\n")
+        else:
+            self.tunes = tunes
+
+        if tokens is None:
+            all_tokens = [token for tune in self.tunes for token in tune]
+            self.tokens = set(all_tokens)
+        else:
+            self.tokens = set(tokens)
         self.tokenizer = Tokenizer(tokens=self.tokens)
-        self.tunes = [self.tokenizer.tokenize(tune) for tune in self.data.split("\n\n")]
+        self.tokenized_tunes = [self.tokenizer.tokenize(tune) for tune in self.tunes]
 
     def __str__(self):
         msg = (
