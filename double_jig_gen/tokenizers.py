@@ -1,6 +1,6 @@
 """Classes which turn strings into lists of tokens."""
 import logging
-from typing import List, Optional, Sequence, Union
+from typing import Collection, List, Optional, Sequence, Union
 
 LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class Tokenizer:
 
     def __init__(
         self,
-        tokens: Sequence[str],
+        tokens: Collection[str],
         unk_token: str = "<unk>",
         start_token: str = "<s>",
         end_token: str = "</s>",

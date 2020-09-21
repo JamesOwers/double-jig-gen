@@ -21,12 +21,7 @@ class ABCDataset:
 
     """
 
-    def __init__(
-        self,
-        filepath: PATHLIKE,
-        tokens: Optional[Sequence[str]] = None,
-        tokenizer: Optional[Tokenizer] = None,
-    ) -> None:
+    def __init__(self, filepath: PATHLIKE,) -> None:
         """Initialises class.
 
         Args:
@@ -34,12 +29,17 @@ class ABCDataset:
         """
         self._filepath = filepath
         self.data = read_and_rstrip_file(filepath)
-        if tokenizer is not None:
-            self.tokenizer = tokenizer
-        elif tokens is not None:
-            self.tokenizer = Tokenizer(tokens=tokens)
-        else:
-            self.tokenizer = Tokenizer(tokens=DEFAULT_TOKENS)
+        self.tokens = set(self.data.split())
+        self.tokenizer = Tokenizer(tokens=self.tokens)
+        self.tunes = [self.tokenizer.tokenize(tune) for tune in self.data.split("\n\n")]
+
+    def __str__(self):
+        msg = (
+            f"vocabulary size: {len(self.tokens)}\n"
+            f"vocabulary (each token separated by a space): \n{' '.join(self.tokens)}\n"
+            f"dataset_size: {len(self.tunes)}"
+        )
+        return msg
 
     def __getitem__(self, index):
         pass
