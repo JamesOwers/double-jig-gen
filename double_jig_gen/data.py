@@ -2,6 +2,8 @@
 from pathlib import Path
 from typing import Callable, Collection, List, Optional, Sequence, Tuple, Union
 
+import numpy as np
+import torch
 from torch.utils.data import DataLoader
 
 from double_jig_gen.io import PATHLIKE, read_and_rstrip_file
@@ -11,6 +13,7 @@ DEFAULT_TOKENS = ()
 
 
 # TODO: enable adding them together trivially
+# TODO: separate out pytorch datasets and those that dont need to be
 class ABCDataset:
     """Parser for an ABC dataset contained in a single file.
 
@@ -35,7 +38,7 @@ class ABCDataset:
         if tunes is None:
             self._filepath = filepath
             self.data = read_and_rstrip_file(filepath)
-            self.tunes = self.data.split("\n\n")
+            self.tunes = [tune.split() for tune in self.data.split("\n\n")]
         else:
             self.tunes = tunes
 
@@ -46,20 +49,33 @@ class ABCDataset:
             self.tokens = set(tokens)
         self.tokenizer = Tokenizer(tokens=self.tokens)
         self.tokenized_tunes = [self.tokenizer.tokenize(tune) for tune in self.tunes]
-
+        self.nr_tunes = len(self.tunes)
+        self.tune_lengths = [len(tune) for tune in self.tokenized_tunes]
+        self.mean_tune_len = np.mean(self.tune_lengths)
+        self.median_tune_len = np.median(self.tune_lengths)
+        self.max_tune_len = np.max(self.tune_lengths)
+        self.min_tune_len = np.min(self.tune_lengths)
+        self.vocabulary_size = len(self.tokenizer.tokens)
+    
     def __str__(self):
+        tokens = self.tokenizer.tokens  # this is self.tokens plus special tokens
         msg = (
-            f"vocabulary size: {len(self.tokens)}\n"
-            f"vocabulary (each token separated by a space): \n{' '.join(self.tokens)}\n"
-            f"dataset_size: {len(self.tunes)}"
+            f"vocabulary size: {self.vocabulary_size}\n"
+            f"vocabulary (each token separated by a space): \n{' '.join(tokens)}\n"
+            f"dataset_size: {len(self)}\n"
+            f"tune length stats:\n\t* max {self.max_tune_len}"
+            f"\n\t* mean {self.mean_tune_len}"
+            f"\n\t* median {self.median_tune_len}"
+            f"\n\t* min {self.min_tune_len}"
         )
         return msg
 
-    def __getitem__(self, index):
-        pass
-
+    def __getitem__(self, idx):
+        tune = self.tokenized_tunes[idx]
+        return torch.Tensor(tune).long()
+    
     def __len__(self):
-        return 0
+        return self.nr_tunes
 
 
 class FolkRNNDataset:

@@ -16,14 +16,16 @@ class Tokenizer:
     def __init__(
         self,
         tokens: Collection[str],
+        pad_token: str = "<pad>",
         unk_token: str = "<unk>",
         start_token: str = "<s>",
         end_token: str = "</s>",
     ):
-        self.special_tokens = [unk_token, start_token, end_token]
-        self.unk_token_index = 0
-        self.start_token_index = 1
-        self.end_token_index = 2
+        self.special_tokens = [pad_token, unk_token, start_token, end_token]
+        self.pad_token_index = 0
+        self.unk_token_index = 1
+        self.start_token_index = 2
+        self.end_token_index = 3
         for special_token in self.special_tokens:
             if special_token in tokens:
                 msg = f"Special token {repr(special_token)} is in the supplied tokens"
