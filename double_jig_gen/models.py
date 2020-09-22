@@ -6,7 +6,7 @@ and
 
 https://github.com/pytorch/examples/blob/master/word_language_model/main.py
 """
-import math
+from argparse import ArgumentParser
 from typing import Optional
 
 import pytorch_lightning as pl
@@ -20,24 +20,51 @@ class SimpleRNN(pl.LightningModule):
     
     Taken from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
     """
-        
+    # TODO: Make it such that these are populated in the init call - it will
+    #       cause bugs to write kwargs in two places.
+    # Argparse settings
+    _hparam_defaults = {
+        "rnn_type": {"type": str, "choices": ("LSTM", "GRU", "RNN_TANH", "RNN_RELU")},
+        "ntoken": {"type": int},
+        "ninp": {"default": 256, "type": int},
+        "nhid": {"default": 512, "type": int},
+        "nlayers": {"default": 3, "type": int},
+        "model_batch_size": {"default": 64, "type": int},
+        "embedding_padding_idx": {"default": 0, "type": int},
+        "dropout": {"default": 0.5, "type": float},
+        "tie_weights": {"default": False, "action": "store_true"},
+        "learning_rate": {"default": 3e-3, "type": float},
+        "weight_decay": {"default": 1e-5, "type": float},
+        "lr_decay_gamma": {"default": 0.3, "type": float},
+        "lr_decay_patience": {"default": 100, "type": int},
+        "optimizer": {"default": "Adam", "type": str},
+        "scheduler": {"default": "ReduceLROnPlateau", "type": str},
+    }
+    
     @classmethod
     def instantiate_from_namespace(cls, args):
-        pass
+        kwargs = {kk: vv for kk, vv in dict(args).items() if kk in cls.hparam_defaults}
+        return cls(**kwargs)
 
     @classmethod
     def add_model_specific_args(cls, parent_parser):
-        pass
+        """Adds args to argparse parent_parser."""
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        for arg_name, arg_kwargs in cls._hparam_defaults.items():
+            parser.add_argument(f"--{arg_name}", **arg_kwargs)
+        return parser
     
     def __init__(
         self,
         rnn_type,
+        # TODO: refactor: make better arg names
         ntoken,
         ninp,
         nhid,
         nlayers,
-        batch_size,
-        embedding_padding_idx,
+        embedding_padding_idx=0,
+        # TODO: remove model_batch_size - should be explicitly stated
+        model_batch_size=64,
         dropout=0.5,
         tie_weights=False,
         learning_rate: float = 3e-3,
@@ -76,7 +103,7 @@ class SimpleRNN(pl.LightningModule):
         # saving parameters to the logs and for reloading from checkpoints
         self.save_hyperparameters()
         
-        self.batch_size = batch_size
+        self.model_batch_size = model_batch_size
         self.embedding_padding_idx = embedding_padding_idx
         self.ntoken = ntoken
         self.dropout_layer = nn.Dropout(dropout)
@@ -183,8 +210,8 @@ class SimpleRNN(pl.LightningModule):
         return outputs.view(seq_len, batch_size, self.ntoken)
 
     def init_hidden(self):        
-        hidden_a = torch.randn(self.nlayers, self.batch_size, self.nhid)
-        hidden_b = torch.randn(self.nlayers, self.batch_size, self.nhid)
+        hidden_a = torch.randn(self.nlayers, self.model_batch_size, self.nhid)
+        hidden_b = torch.randn(self.nlayers, self.model_batch_size, self.nhid)
         
 #         if self.hparams.on_gpu:
         # TODO: fix this hack to make work on CPU too. Need to work out how to get

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Script to train models for sequence models.
 
 Boilerplate code for training a model (selected with `--model`) defined as a
@@ -72,7 +73,7 @@ import pytorch_lightning as pl
 import torch
 
 from double_jig_gen.data import get_folkrnn_dataloaders, get_oneills_dataloaders
-from double_jig_gen.models import LSTM, Transformer
+from double_jig_gen.models import SimpleRNN, Transformer
 from double_jig_gen.utils import (
     get_model_from_checkpoint,
     get_trainer_from_checkpoint,
@@ -80,8 +81,8 @@ from double_jig_gen.utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MODELS: Dict[str, Union[Type[LSTM], Type[Transformer]]] = {
-    "lstm": LSTM,
+MODELS: Dict[str, Union[Type[SimpleRNN], Type[Transformer]]] = {
+    "rnn": SimpleRNN,
     "transformer": Transformer,
 }
 DATASETS = ["folkrnn", "oneills"]
@@ -97,7 +98,7 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
     new_parser.add_argument(
         "--batch_size",
         type=int,
-        default=16,
+        default=64,
         help="Number of data items in the batch for the training dataloader.",
     )
     new_parser.add_argument(

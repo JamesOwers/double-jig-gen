@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Union
 
 import pytorch_lightning as pl
+import requests
 
 LOGGER = logging.getLogger(__name__)
 
@@ -106,3 +107,23 @@ def get_model_from_checkpoint(
         raise ValueError(f"Checkpoint file {ckpt_path} doesn't exist.")
     model = ModelClass.load_from_checkpoint(checkpoint_path=str(ckpt_path))
     return model
+
+
+def download_file(url, local_filename=None, min_size_bytes=100):
+    """Downloads file at url."""
+    if local_filename is None:
+        local_filename = url.rsplit("/")[-1]
+    file_exists = Path(local_filename).exists()
+    file_corrupt = False
+    if file_exists:
+        LOGGER.info("file already exists at %s, not downloading", local_filename)
+        file_size = Path(local_filename).stat().st_size
+        if file_size < min_size_bytes:
+            LOGGER.warning(
+                "file less than %d bytes, downloading again.", min_size_bytes
+            )
+            file_corrupt = True
+    if (not file_exists) or file_corrupt:
+        req_result = requests.get(url, allow_redirects=True)
+        with open(f"{local_filename}", "wb") as filehandle:
+            filehandle.write(req_result.content)
