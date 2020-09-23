@@ -14,6 +14,13 @@ from double_jig_gen.tokenizers import Tokenizer
 LOGGER = logging.getLogger(__name__)
 
 
+def pad_batch(batch, pad_idx):
+    "Function which adds padding to each batch up to the longest sequence."
+    lengths = [seq.shape[0] for seq in batch]
+    data = pad_sequence(batch, batch_first=False, padding_value=pad_idx)
+    return data, lengths
+
+
 # TODO: enable adding them together trivially
 # TODO: separate out pytorch datasets and those that dont need to be
 class ABCDataset:
@@ -32,12 +39,14 @@ class ABCDataset:
         tunes: Optional[List[str]] = None,
         tokens: Optional[Collection[str]] = None,
         subset: Optional[Collection[int]] = None,
+        wrap_tunes: bool = True,
     ) -> None:
         """Initialises class.
 
         Args:
             filepath: path to the file containing the ABC data.
         """
+        self._wrap_tunes = wrap_tunes
         if tunes is None:
             self._filepath = filepath
             self.data = read_and_rstrip_file(filepath)
@@ -52,7 +61,9 @@ class ABCDataset:
         else:
             self.tokens = set(tokens)
         self.tokenizer = Tokenizer(tokens=self.tokens)
-        self.tokenized_tunes = [self.tokenizer.tokenize(tune) for tune in self.tunes]
+        self.tokenized_tunes = [
+            self.tokenizer.tokenize(tune, wrap=wrap_tunes) for tune in self.tunes
+        ]
         self.nr_tunes = len(self.tunes)
         self.tune_lengths = [len(tune) for tune in self.tokenized_tunes]
         self.mean_tune_len = np.mean(self.tune_lengths)
@@ -126,19 +137,15 @@ def get_folkrnn_dataloaders(
     pad_idx = train_dataset.tokenizer.pad_token_index
     LOGGER.info(f"Padding token index read as {pad_idx}")
     
-    def pad_batch(batch):
-        "Function which adds padding to each batch up to the longest sequence."
-        lengths = [seq.shape[0] for seq in batch]
-        data = pad_sequence(batch, batch_first=False, padding_value=pad_idx)
-        return data, lengths
-
+    pad_folkrnn_batch = lambda batch: pad_batch(batch, pad_idx=pad_idx)
+    
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_batch,
+        collate_fn=pad_folkrnn_batch,
     )
     LOGGER.info("Loading folkrnn validation dataset")
     val_dataset = FolkRNNDataset(filepath=filepath, subset_name="valid")
@@ -148,7 +155,7 @@ def get_folkrnn_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_batch,
+        collate_fn=pad_folkrnn_batch,
     )
     LOGGER.info("Loading folkrnn test dataset")
     test_dataset = FolkRNNDataset(filepath=filepath, subset_name="test")
@@ -158,7 +165,7 @@ def get_folkrnn_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_batch,
+        collate_fn=pad_folkrnn_batch,
     )
     return train_dataloader, val_dataloader, test_dataloader
 

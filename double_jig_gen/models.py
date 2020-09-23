@@ -7,12 +7,14 @@ and
 https://github.com/pytorch/examples/blob/master/word_language_model/main.py
 """
 from argparse import ArgumentParser
-from typing import Optional
+from typing import Optional, Sequence
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 class SimpleRNN(pl.LightningModule):
@@ -180,11 +182,11 @@ class SimpleRNN(pl.LightningModule):
 
     def forward(self, padded_batch, seq_lengths):
         """padded batch of shape seq_len, batch_size"""
-        self.hidden = self.init_hidden()
         
-        seq_len, batch_size = padded_batch.shape
+        batch_seq_len, batch_size = padded_batch.shape
+        self.hidden = self.init_hidden(batch_size)
         
-        # seq_len, batch_size, embedding_size 
+        # max_seq_len, batch_size, embedding_size 
         outputs = self.dropout_layer(self.encoder_layer(padded_batch))
         
         # https://gist.github.com/HarshTrivedi/f4e7293e941b17d19058f6fb90ab0fec
@@ -206,11 +208,27 @@ class SimpleRNN(pl.LightningModule):
         outputs = self.decoder_layer(outputs)
         outputs = outputs.view(-1, self.ntoken)
         outputs = F.log_softmax(outputs, dim=1)
-        return outputs.view(seq_len, batch_size, self.ntoken)
+        
+        nr_trailing_pad_rows = batch_seq_len - max(seq_lengths)
+        if nr_trailing_pad_rows == 0:
+            outputs = outputs.view(batch_seq_len, batch_size, self.ntoken)
+        elif nr_trailing_pad_rows > 0:
+            outputs = outputs.view(max(seq_lengths), batch_size, self.ntoken)
+            outputs = F.pad(
+                input=outputs,
+                pad=(0, 0, 0, 0, 0, 1),  # Pad bottom of seqs
+                mode="constant",
+                value=self.embedding_padding_idx,
+            )
+        else:
+            raise ValueError("max(seq_lengths) > batch_seq_len")
+        return outputs
 
-    def init_hidden(self):        
-        hidden_a = torch.randn(self.nlayers, self.model_batch_size, self.nhid)
-        hidden_b = torch.randn(self.nlayers, self.model_batch_size, self.nhid)
+    def init_hidden(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.model_batch_size
+        hidden_a = torch.randn(self.nlayers, batch_size, self.nhid)
+        hidden_b = torch.randn(self.nlayers, batch_size, self.nhid)
         
 #         if self.hparams.on_gpu:
         # TODO: fix this hack to make work on CPU too. Need to work out how to get
@@ -287,6 +305,82 @@ class SimpleRNN(pl.LightningModule):
             return self.optimizer
         else:
             return [self.optimizer], [self.scheduler]
+
+    def generate_next_token(
+        self,
+        padded_batch,
+        seq_lengths,
+        topk=5,
+        sample_type="proportional",
+        temperature=1.0,
+    ):
+        """Expects model.eval() to have been called"""
+        with torch.no_grad():
+            predictions = self(padded_batch, seq_lengths)
+            next_predictions = predictions[
+                np.array(seq_lengths) - 1,
+                range(predictions.shape[1])
+            ]
+            log_probs, tokens = torch.topk(next_predictions, k=topk)
+            if sample_type == "equal":
+                idx = torch.randint(low=0, high=topk, size=token_indexes.shape[0])
+            elif sample_type == "proportional":
+                probs = F.softmax(log_probs, dim=-1) / temperature
+                idx = probs.multinomial(num_samples=1).squeeze()
+            next_tokens = tokens[range(tokens.shape[0]), idx]
+        
+        return next_tokens
+    
+    def generate_tunes(
+        self,
+        sequences,
+        sequence_lengths,
+        max_nr_generation_steps,
+        end_token_idx=None,
+        tokenizer=None,
+        top_k=5,
+        sample_type="proportional",
+        temperature=1.0, 
+    ):
+        """"""
+        is_training = self.training
+        if is_training:
+            self.eval()
+        sequence_lengths = np.array(sequence_lengths)
+        still_generating = np.array([True] * sequences.shape[1])
+        if end_token_idx is None:
+            end_token_idx = tokenizer.end_token_index
+        for ii in tqdm(range(max_nr_generation_steps)):
+            next_tokens = self.generate_next_token(
+                sequences[:, still_generating], 
+                sequence_lengths[still_generating],
+                topk=top_k,
+                sample_type=sample_type,
+                temperature=temperature,
+            )
+            sequences = F.pad(
+                input=sequences,
+                pad=(0, 0, 0, 1),  # Pad bottom
+                mode="constant",
+                value=self.embedding_padding_idx,
+            )
+            sequences[
+                sequence_lengths[still_generating], still_generating
+            ] = next_tokens
+            if all(sequences[-1] == 0):
+                sequences = sequences[:-1]
+            sequence_lengths[still_generating] += 1
+            last_tokens = sequences[sequence_lengths - 1, range(sequences.shape[1])]
+            still_generating = np.array((last_tokens != end_token_idx).tolist())
+            if still_generating.sum() == 0:
+                break
+        if tokenizer is not None:
+            generations = [tokenizer.untokenize(seq.cpu()) for seq in sequences.T]
+        else:
+            generations = sequences
+        if is_training:
+            self.train()
+        return generations, sequence_lengths
         
 
 class Transformer(pl.LightningModule):
