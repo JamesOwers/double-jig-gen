@@ -26,24 +26,24 @@ class SimpleRNN(pl.LightningModule):
     _hparam_defaults = {
         "rnn_type": {"type": str, "choices": ("LSTM", "GRU", "RNN_TANH", "RNN_RELU")},
         "ntoken": {"type": int},
+        "model_batch_size": {"type": int},
+        "embedding_padding_idx": {"type": int},
         "ninp": {"default": 256, "type": int},
         "nhid": {"default": 512, "type": int},
         "nlayers": {"default": 3, "type": int},
-        "model_batch_size": {"default": 64, "type": int},
-        "embedding_padding_idx": {"default": 0, "type": int},
         "dropout": {"default": 0.5, "type": float},
         "tie_weights": {"default": False, "action": "store_true"},
         "learning_rate": {"default": 3e-3, "type": float},
         "weight_decay": {"default": 1e-5, "type": float},
-        "lr_decay_gamma": {"default": 0.3, "type": float},
-        "lr_decay_patience": {"default": 100, "type": int},
+        "lr_decay_gamma": {"default": 0.5, "type": float},
+        "lr_decay_patience": {"default": 10, "type": int},
         "optimizer": {"default": "Adam", "type": str},
         "scheduler": {"default": "ReduceLROnPlateau", "type": str},
     }
     
     @classmethod
     def instantiate_from_namespace(cls, args):
-        kwargs = {kk: vv for kk, vv in dict(args).items() if kk in cls.hparam_defaults}
+        kwargs = {kk: vv for kk, vv in vars(args).items() if kk in cls._hparam_defaults}
         return cls(**kwargs)
 
     @classmethod
@@ -62,15 +62,14 @@ class SimpleRNN(pl.LightningModule):
         ninp,
         nhid,
         nlayers,
-        embedding_padding_idx=0,
-        # TODO: remove model_batch_size - should be explicitly stated
-        model_batch_size=64,
+        embedding_padding_idx,
+        model_batch_size,
         dropout=0.5,
         tie_weights=False,
         learning_rate: float = 3e-3,
         weight_decay: float = 1e-5,
-        lr_decay_gamma: float = 0.3,
-        lr_decay_patience: int = 100,
+        lr_decay_gamma: float = 0.5,
+        lr_decay_patience: int = 10,
         optimizer: str = "Adam",
         scheduler: Optional[str] = None,
     ):
@@ -169,7 +168,7 @@ class SimpleRNN(pl.LightningModule):
                 self.optimizer,
                 factor=self.lr_decay_gamma,
                 patience=self.lr_decay_patience,
-                cooldown=10,
+                cooldown=0,
             )
         else:
             self.scheduler = None

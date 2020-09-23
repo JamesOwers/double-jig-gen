@@ -1,15 +1,17 @@
 """Dataset preprocessing and item getting classes."""
+import logging
 from pathlib import Path
 from typing import Callable, Collection, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
 from double_jig_gen.io import PATHLIKE, read_and_rstrip_file
 from double_jig_gen.tokenizers import Tokenizer
 
-DEFAULT_TOKENS = ()
+LOGGER = logging.getLogger(__name__)
 
 
 # TODO: enable adding them together trivially
@@ -29,6 +31,7 @@ class ABCDataset:
         filepath: Optional[PATHLIKE] = None,
         tunes: Optional[List[str]] = None,
         tokens: Optional[Collection[str]] = None,
+        subset: Optional[Collection[int]] = None,
     ) -> None:
         """Initialises class.
 
@@ -41,7 +44,8 @@ class ABCDataset:
             self.tunes = [tune.split() for tune in self.data.split("\n\n")]
         else:
             self.tunes = tunes
-
+        if subset is not None:
+            self.tunes = np.array(self.tunes, dtype='object')[subset].tolist()
         if tokens is None:
             all_tokens = [token for tune in self.tunes for token in tune]
             self.tokens = set(all_tokens)
@@ -78,13 +82,34 @@ class ABCDataset:
         return self.nr_tunes
 
 
-class FolkRNNDataset:
-    def __init__(self, subset):
-        pass
+class FolkRNNDataset(ABCDataset):
+    """Expects vocab and splits files to have been made."""
+    def __init__(
+        self,
+        filepath: PATHLIKE,
+        subset_name: Optional[str] = None,
+    ) -> None:
+        filepath = Path(filepath).resolve()
+        with open(f"{str(filepath)}_vocabulary.txt", "r") as file_handle:
+            tokens = file_handle.read().splitlines()
+        if subset_name is not None:
+            with open(f"{str(filepath)}_{subset_name}_split.txt", "r") as file_handle:
+                subset_indices = [int(idx) for idx in file_handle.read().splitlines()]
+        else:
+            subset_indices = None
+        
+        super().__init__(
+            filepath=filepath,
+            tokens=tokens,
+            subset=subset_indices,
+        )
 
 
 def get_folkrnn_dataloaders(
-    batch_size: int, num_workers: int, pin_memory: bool,
+    filepath: PATHLIKE,
+    batch_size: int,
+    num_workers: int,
+    pin_memory: bool,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """Returns training, validation, and test dataloaders (respectively) for folkrnn.
 
@@ -96,29 +121,44 @@ def get_folkrnn_dataloaders(
     Returns:
         train_dataloader, validation_dataloader, test_dataloader: Dataloader classes.
     """
-    train_dataset = FolkRNNDataset(subset="train")
+    LOGGER.info("Loading folkrnn train dataset")
+    train_dataset = FolkRNNDataset(filepath=filepath, subset_name="train")
+    pad_idx = train_dataset.tokenizer.pad_token_index
+    LOGGER.info(f"Padding token index read as {pad_idx}")
+    
+    def pad_batch(batch):
+        "Function which adds padding to each batch up to the longest sequence."
+        lengths = [seq.shape[0] for seq in batch]
+        data = pad_sequence(batch, batch_first=False, padding_value=pad_idx)
+        return data, lengths
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        collate_fn=pad_batch,
     )
-    val_dataset = FolkRNNDataset(subset="valid")
+    LOGGER.info("Loading folkrnn validation dataset")
+    val_dataset = FolkRNNDataset(filepath=filepath, subset_name="valid")
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        collate_fn=pad_batch,
     )
-    test_dataset = FolkRNNDataset(subset="test")
+    LOGGER.info("Loading folkrnn test dataset")
+    test_dataset = FolkRNNDataset(filepath=filepath, subset_name="test")
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        collate_fn=pad_batch,
     )
     return train_dataloader, val_dataloader, test_dataloader
 

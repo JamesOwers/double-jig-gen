@@ -110,7 +110,7 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
     new_parser.add_argument(
         "--early_stopping_patience",
         type=int,
-        default=140,
+        default=50,
         help=(
             "maximum number of epochs to train after no improvement in validation "
             "loss."
@@ -178,6 +178,12 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
         default="INFO",
         type=str,
         help="Logging level to set for the logger.",
+    )
+    
+    new_parser.add_argument(
+        "--folkrnn_data_path",
+        type=str,
+        help="Location of the folkrnn data and adjacent splits and vocab files.",
     )
     return new_parser
 
@@ -274,7 +280,27 @@ if __name__ == "__main__":
         lightning_trainer = pl.Trainer.from_argparse_args(
             args, deterministic=True, early_stop_callback=early_stop_callback
         )
-
+    
+    LOGGER.info(f"Loading '{args.dataset}' dataset and getting dataloaders")
+    if args.dataset == "folkrnn":
+        dataloaders = get_folkrnn_dataloaders(
+            filepath=args.folkrnn_data_path,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            pin_memory=args.pin_memory,
+        )
+        train_dataloader, val_dataloader, test_dataloader = dataloaders
+    else:
+        raise NotImplementedError(f"{args.dataset} is not a configured dataset.")
+    
+    # modelling args to read from the dataset - same in all datasets
+    if args.embedding_padding_idx is None:
+        args.embedding_padding_idx = train_dataloader.dataset.tokenizer.pad_token_index
+    if args.ntoken is None:
+        args.ntoken = train_dataloader.dataset.vocabulary_size
+    if args.model_batch_size is None:
+        args.model_batch_size = args.batch_size
+    
     # All the keyword arguments for each model are defined within its classmethod
     # .add_model_specific_args() and added to args in parse_and_validate_args() above.
     ModelClass = MODELS[args.model]
@@ -284,25 +310,16 @@ if __name__ == "__main__":
     else:
         # TODO: There's totally a more transparent way of doing this. Look into
         # using inspect.signature to avoid the creation of instantiate_from_namespace.
+        # TODO: currently, we must state ntoken, and embedding_padding_idx from command line
+        #       this should be shifted to being read from dataset
         model = ModelClass.instantiate_from_namespace(args)
 
-    if args.dataset == "folkrnn":
-        dataloaders = get_folkrnn_dataloaders(
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            pin_memory=args.pin_memory,
-        )
-        train_dataloader, val_dataloader, test_dataloader = dataloaders
-    else:
-        # e.g. get_extrememusic_dataloaders(args)
-        raise NotImplementedError(f"{args.dataset} is not a configured dataset.")
-
     experiment_args_path = Path(
-        lightning_trainer.logger.log_dir, "experiment_args.json"
+        lightning_trainer.logger.log_dir, "experiment_args.yaml"
     )
     experiment_args_path.parent.mkdir(parents=True)
     LOGGER.info("Saving experiment call args to %s", experiment_args_path)
-    save_args(experiment_args_path, args, indent=4, sort_keys=True)
+    pl.core.saving.save_hparams_to_yaml(experiment_args_path, args)
 
     LOGGER.info("%s Training %s", 30 * "=", 30 * "=")
     lightning_trainer.fit(
