@@ -5,6 +5,7 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, Union
 
+import numpy as np
 import pytorch_lightning as pl
 import requests
 
@@ -127,3 +128,17 @@ def download_file(url, local_filename=None, min_size_bytes=100):
         req_result = requests.get(url, allow_redirects=True)
         with open(f"{local_filename}", "wb") as filehandle:
             filehandle.write(req_result.content)
+
+
+def round_to_nearest_batch_size(
+    total: int,
+    prop: float,
+    batch_size: int,
+):
+    float_count = total * prop
+    # round to a multiple of batch_size
+    rounded_count = batch_size * max(
+        1,
+        int(np.rint(float_count / batch_size))
+    )
+    return rounded_count

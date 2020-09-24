@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from double_jig_gen.utils import download_file
+from double_jig_gen.utils import download_file, round_to_nearest_batch_size
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
@@ -15,20 +15,6 @@ LOGGER.setLevel("DEBUG")
 FOLKRNN_V3_URL = (
     "https://raw.githubusercontent.com/IraKorshunova/folk-rnn/master/data/data_v3"
 )
-
-
-def round_to_nearest_batch_size(
-    total: int,
-    prop: float,
-    batch_size: int,
-):
-    float_count = total * prop
-    # round to a multiple of batch_size
-    rounded_count = batch_size * max(
-        1,
-        int(np.rint(float_count / batch_size))
-    )
-    return rounded_count
 
 
 def download_get_tokens_and_make_splits(

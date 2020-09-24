@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 
 from double_jig_gen.io import PATHLIKE, read_and_rstrip_file
 from double_jig_gen.tokenizers import Tokenizer
+from double_jig_gen.utils import round_to_nearest_batch_size
 
 LOGGER = logging.getLogger(__name__)
 
@@ -170,5 +171,95 @@ def get_folkrnn_dataloaders(
     return train_dataloader, val_dataloader, test_dataloader
 
 
-def get_oneills_dataloaders():
-    pass
+def get_oneills_dataloaders(
+    filepath: PATHLIKE,
+    folkrnn_vocab_filepath: PATHLIKE,
+    batch_size: int,
+    num_workers: int,
+    pin_memory: bool,
+    val_prop: float = .05,
+    val_seed: Optional[int] = None,
+    val_shuffle: bool = False,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    """Returns training, validation, and test dataloaders (respectively) for folkrnn.
+
+    Args:
+        batch_size: the number of items within the batch to return.
+        num_workers: the number of workers for the dataloaders.
+        pin_memory: whether to pin memory.
+        val_prop:
+        val_seed: seed for doing the validation split. If not set, chosen randomly.
+        val_shuffle:
+    Returns:
+        train_dataloader, validation_dataloader, test_dataloader: Dataloader classes.
+    """
+    LOGGER.info(f"Reading folkrnn vocabulary from {folkrnn_vocab_filepath}.")
+    with open(folkrnn_vocab_filepath, "r") as file_handle:
+        tokens = file_handle.read().splitlines()
+    LOGGER.info("Loading oneills dataset and creating train/test split")
+    oneills_size = 361
+    test_prop = .1
+    test_idx, train_idx = split_array(list(range(oneills_size)), test_prop, batch_size)
+    test_dataset = ABCDataset(filepath=filepath, tokens=tokens, subset=test_idx)
+    LOGGER.info(f"Test dataset:\n{test_dataset}")
+    if val_prop == 1:
+        LOGGER.info(
+            "Using the full training dataset for both training and validation. "
+            "In this context we are training and validating on the whole dataset. "
+            "val_shuffle will be set to true such that the whole dataset is used. "
+            "TIP: use pytorch lightning limit_train_batches and limit_val_batches."
+        ) 
+        val_idx = train_idx
+        train_dataset = ABCDataset(filepath, tokens=tokens, subset=train_idx)
+        val_dataset = ABCDataset(filepath, tokens=tokens, subset=val_idx)
+        val_shuffle = True
+    else:
+        if val_seed is None:
+            val_seed= np.random.randint(0, 2**32 - 1)
+        val_idx, train_idx = split_array(train_idx, val_prop, batch_size, val_seed)
+        LOGGER.info(
+            f"Splitting training set into a train val set of {len(train_idx)} and "
+            f"{len(val_idx)} respectively. Used seed {val_seed}"
+        )
+        train_dataset = ABCDataset(filepath, tokens=tokens, subset=train_idx)
+        val_dataset = ABCDataset(filepath, tokens=tokens, subset=val_idx)
+    
+    pad_idx = test_dataset.tokenizer.pad_token_index
+    LOGGER.info(f"Padding token index read as {pad_idx}")
+    
+    _pad_batch = lambda batch: pad_batch(batch, pad_idx=pad_idx)
+    
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        collate_fn=_pad_batch,
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=val_shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        collate_fn=_pad_batch,
+    )
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        collate_fn=_pad_batch,
+    )
+    return train_dataloader, val_dataloader, test_dataloader
+
+
+def split_array(array, prop, batch_size, seed=None):
+    nr_items = len(array)
+    nr_train = round_to_nearest_batch_size(nr_items, prop, batch_size)
+    rng = np.random.RandomState(seed)
+    rng.shuffle(array)
+    train_idx, test_idx = np.split(array, [nr_train])
+    return train_idx, test_idx

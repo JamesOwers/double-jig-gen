@@ -185,9 +185,9 @@ class SimpleRNN(pl.LightningModule):
         
         batch_seq_len, batch_size = padded_batch.shape
         self.hidden = self.init_hidden(batch_size)
-        
         # max_seq_len, batch_size, embedding_size 
-        outputs = self.dropout_layer(self.encoder_layer(padded_batch))
+        outputs = self.encoder_layer(padded_batch)
+        outputs = self.dropout_layer(outputs)
         
         # https://gist.github.com/HarshTrivedi/f4e7293e941b17d19058f6fb90ab0fec
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
@@ -203,7 +203,8 @@ class SimpleRNN(pl.LightningModule):
             outputs,
             batch_first=False,
         )
-                
+        
+        outputs = outputs.contiguous()
         outputs = self.dropout_layer(outputs)
         outputs = self.decoder_layer(outputs)
         outputs = outputs.view(-1, self.ntoken)

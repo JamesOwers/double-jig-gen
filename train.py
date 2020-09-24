@@ -185,6 +185,31 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
         type=str,
         help="Location of the folkrnn data and adjacent splits and vocab files.",
     )
+        
+    new_parser.add_argument(
+        "--oneills_data_path",
+        type=str,
+        help="Location of the oneills data.",
+    )
+        
+    new_parser.add_argument(
+        "--val_prop",
+        default=0.05,
+        type=float,
+        help=(
+            "Oneills data - proportion of the training set to use for validation, "
+            "set to 1 to use the full dataset for both training and validaiton."
+        ),
+    )
+    new_parser.add_argument(
+        "--val_shuffle",
+        default=False,
+        action="store_true",
+        help=(
+            "Oneills data - whether to shuffle the validation set. Makes sense if "
+            "using the full set for both test and train."
+        ),
+    )
     return new_parser
 
 
@@ -290,6 +315,18 @@ if __name__ == "__main__":
             pin_memory=args.pin_memory,
         )
         train_dataloader, val_dataloader, test_dataloader = dataloaders
+    if args.dataset == "oneills":
+        dataloaders = get_oneills_dataloaders(
+            filepath=args.oneills_data_path,
+            folkrnn_vocab_filepath=str(args.folkrnn_data_path) + "_vocabulary.txt",
+            val_prop=args.val_prop,
+            val_seed=args.seed,
+            val_shuffle=args.val_shuffle,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            pin_memory=args.pin_memory,
+        )
+        train_dataloader, val_dataloader, test_dataloader = dataloaders
     else:
         raise NotImplementedError(f"{args.dataset} is not a configured dataset.")
     
@@ -307,6 +344,7 @@ if __name__ == "__main__":
     if args.model_load_from_checkpoint is not None:
         ckpt_path = Path(args.model_load_from_checkpoint).expanduser().resolve()
         model = get_model_from_checkpoint(ckpt_path, ModelClass)
+        model.model_batch_size = args.model_batch_size  # could change between runs
     else:
         # TODO: There's totally a more transparent way of doing this. Look into
         # using inspect.signature to avoid the creation of instantiate_from_namespace.
@@ -321,10 +359,17 @@ if __name__ == "__main__":
     LOGGER.info("Saving experiment call args to %s", experiment_args_path)
     pl.core.saving.save_hparams_to_yaml(experiment_args_path, args)
 
-    LOGGER.info("%s Training %s", 30 * "=", 30 * "=")
-    lightning_trainer.fit(
-        model, train_dataloader=train_dataloader, val_dataloaders=val_dataloader
-    )
-
     if args.test:
-        lightning_trainer.test(test_dataloaders=test_dataloader)
+        LOGGER.info("%s Testing (not_training) %s", 30 * "=", 30 * "=")
+        lightning_trainer.test(
+            model,
+            test_dataloaders=test_dataloader,
+#             ckpt_path="/disk/scratch_fast/s0816700/logs/lightning_logs/version_23/checkpoints/epoch=95.ckpt",
+#             ckpt_path=str(args.model_load_from_checkpoint),
+            ckpt_path=None,
+        )
+    else:
+        LOGGER.info("%s Training %s", 30 * "=", 30 * "=")
+        lightning_trainer.fit(
+            model, train_dataloader=train_dataloader, val_dataloaders=val_dataloader
+        )

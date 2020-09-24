@@ -1,0 +1,193 @@
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='0,'
+./train.py --num_workers 8 --model rnn --rnn_type GRU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='1,'
+./train.py --num_workers 8 --model rnn --rnn_type RNN_TANH --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='2,'
+./train.py --num_workers 8 --model rnn --rnn_type RNN_RELU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,'
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='0,'
+./train.py --num_workers 8 --model rnn --rnn_type GRU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='1,'
+./train.py --num_workers 8 --model rnn --rnn_type RNN_TANH --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='2,'
+./train.py --num_workers 8 --model rnn --rnn_type RNN_RELU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100
+./train.py --num_workers 8 --model rnn --rnn_type RNN_RELU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100 --gradient_clip_val=5
+./train.py --num_workers 8 --model rnn --rnn_type RNN_RELU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100 --gradient_clip_val=0.5
+
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='4,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100
+./train.py --num_workers 8 --model rnn --rnn_type GRU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='5,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100
+./train.py --num_workers 8 --model rnn --rnn_type GRU --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='6,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 100
+
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='3,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 10
+./train.py --num_workers 8 --model rnn --rnn_type LSTM --dataset folkrnn --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 --default_root_dir /disk/scratch_fast/s0816700/logs --gpus='4,' --early_stopping_patience 100 --lr_decay_gamma 0.5 --lr_decay_patience 10
+
+
+
+
+./train.py \
+    --gpus='0,' \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path=/disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop=0.05 \
+    --batch_size=16 \
+    --default_root_dir=/disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10
+./train.py \
+    --gpus='1,' \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path=/disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop=0.05 \
+    --batch_size=16 \
+    --default_root_dir=/disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10
+
+
+./train.py \
+    --gpus='2,' \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 1 \
+    --limit_train_batches 0.5 \
+    --limit_val_batches 0.5 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10 \
+    --val_shuffle
+./train.py \
+    --gpus='3,' \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 1 \
+    --limit_train_batches 0.5 \
+    --limit_val_batches 0.5 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10 \
+    --val_shuffle
+
+./train.py \
+    --gpus='4,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_5/checkpoints/epoch\=483.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 0.2 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10
+./train.py \
+    --gpus='5,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_5/checkpoints/epoch\=483.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 0.2 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10
+
+
+./train.py \
+    --gpus='6,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_5/checkpoints/epoch\=483.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 1 \
+    --limit_train_batches 0.5 \
+    --limit_val_batches 0.5 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10 \
+    --val_shuffle
+./train.py \
+    --gpus='7,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_5/checkpoints/epoch\=483.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path /disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --val_prop 1 \
+    --limit_train_batches 0.5 \
+    --limit_val_batches 0.5 \
+    --batch_size 16 \
+    --default_root_dir /disk/scratch_fast/s0816700/logs \
+    --early_stopping_patience 100 \
+    --lr_decay_gamma 0.5 \
+    --lr_decay_patience 10 \
+    --val_shuffle
+    
+./train.py \
+    --gpus='0,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_23/checkpoints/epoch=95.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path=/disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --batch_size 16 \
+    --default_root_dir=/disk/scratch_fast/s0816700/logs \
+    --test
+./train.py \
+    --gpus='0,' \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path=/disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --batch_size 16 \
+    --default_root_dir=/disk/scratch_fast/s0816700/logs \
+    --test
+    
+CUDA_LAUNCH_BLOCKING=1 ./train.py \
+    --gpus='0,' \
+    --model_load_from_checkpoint /disk/scratch_fast/s0816700/logs/lightning_logs/version_23/checkpoints/epoch=95.ckpt \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset oneills \
+    --folkrnn_data_path /disk/scratch_fast/s0816700/data/folk-rnn/data_v3 \
+    --oneills_data_path=/disk/scratch_fast/s0816700/data/oneills/oneills_reformat.abc \
+    --batch_size 16 \
+    --default_root_dir=/disk/scratch_fast/s0816700/logs \
+    --test
+    
