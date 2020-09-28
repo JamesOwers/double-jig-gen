@@ -37,9 +37,7 @@ class Tokenizer:
     # TODO: Make __call__ which (un)tokenizes automagically
 
     def tokenize(
-        self, 
-        str_or_sequence: Union[str, Sequence[str]],
-        wrap: bool = True,    
+        self, str_or_sequence: Union[str, Sequence[str]], wrap: bool = True,
     ) -> List[int]:
         if isinstance(str_or_sequence, str):
             token_sequence = str_or_sequence.split()
@@ -52,7 +50,9 @@ class Tokenizer:
             for token in token_sequence
         ]
         if wrap:
-            int_sequence = [self.start_token_index] + int_sequence + [self.end_token_index]
+            int_sequence = (
+                [self.start_token_index] + int_sequence + [self.end_token_index]
+            )
         return int_sequence
 
     def untokenize(self, str_or_sequence: Union[str, Sequence[int]]) -> List[str]:

@@ -55,7 +55,7 @@ class ABCDataset:
         else:
             self.tunes = tunes
         if subset is not None:
-            self.tunes = np.array(self.tunes, dtype='object')[subset].tolist()
+            self.tunes = np.array(self.tunes, dtype="object")[subset].tolist()
         if tokens is None:
             all_tokens = [token for tune in self.tunes for token in tune]
             self.tokens = set(all_tokens)
@@ -72,7 +72,7 @@ class ABCDataset:
         self.max_tune_len = np.max(self.tune_lengths)
         self.min_tune_len = np.min(self.tune_lengths)
         self.vocabulary_size = len(self.tokenizer.tokens)
-    
+
     def __str__(self):
         tokens = self.tokenizer.tokens  # this is self.tokens plus special tokens
         msg = (
@@ -89,18 +89,15 @@ class ABCDataset:
     def __getitem__(self, idx):
         tune = self.tokenized_tunes[idx]
         return torch.Tensor(tune).long()
-    
+
     def __len__(self):
         return self.nr_tunes
 
 
 class FolkRNNDataset(ABCDataset):
     """Expects vocab and splits files to have been made."""
-    def __init__(
-        self,
-        filepath: PATHLIKE,
-        subset_name: Optional[str] = None,
-    ) -> None:
+
+    def __init__(self, filepath: PATHLIKE, subset_name: Optional[str] = None,) -> None:
         filepath = Path(filepath).resolve()
         with open(f"{str(filepath)}_vocabulary.txt", "r") as file_handle:
             tokens = file_handle.read().splitlines()
@@ -109,19 +106,14 @@ class FolkRNNDataset(ABCDataset):
                 subset_indices = [int(idx) for idx in file_handle.read().splitlines()]
         else:
             subset_indices = None
-        
+
         super().__init__(
-            filepath=filepath,
-            tokens=tokens,
-            subset=subset_indices,
+            filepath=filepath, tokens=tokens, subset=subset_indices,
         )
 
 
 def get_folkrnn_dataloaders(
-    filepath: PATHLIKE,
-    batch_size: int,
-    num_workers: int,
-    pin_memory: bool,
+    filepath: PATHLIKE, batch_size: int, num_workers: int, pin_memory: bool,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """Returns training, validation, and test dataloaders (respectively) for folkrnn.
 
@@ -137,9 +129,10 @@ def get_folkrnn_dataloaders(
     train_dataset = FolkRNNDataset(filepath=filepath, subset_name="train")
     pad_idx = train_dataset.tokenizer.pad_token_index
     LOGGER.info(f"Padding token index read as {pad_idx}")
-    
-    pad_folkrnn_batch = lambda batch: pad_batch(batch, pad_idx=pad_idx)
-    
+
+    def pad_folkrnn_batch(batch):
+        return pad_batch(batch, pad_idx=pad_idx)
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -177,7 +170,7 @@ def get_oneills_dataloaders(
     batch_size: int,
     num_workers: int,
     pin_memory: bool,
-    val_prop: float = .05,
+    val_prop: float = 0.05,
     val_seed: Optional[int] = None,
     val_shuffle: bool = False,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
@@ -198,7 +191,7 @@ def get_oneills_dataloaders(
         tokens = file_handle.read().splitlines()
     LOGGER.info("Loading oneills dataset and creating train/test split")
     oneills_size = 361
-    test_prop = .1
+    test_prop = 0.1
     test_idx, train_idx = split_array(list(range(oneills_size)), test_prop, batch_size)
     test_dataset = ABCDataset(filepath=filepath, tokens=tokens, subset=test_idx)
     LOGGER.info(f"Test dataset:\n{test_dataset}")
@@ -208,14 +201,14 @@ def get_oneills_dataloaders(
             "In this context we are training and validating on the whole dataset. "
             "val_shuffle will be set to true such that the whole dataset is used. "
             "TIP: use pytorch lightning limit_train_batches and limit_val_batches."
-        ) 
+        )
         val_idx = train_idx
         train_dataset = ABCDataset(filepath, tokens=tokens, subset=train_idx)
         val_dataset = ABCDataset(filepath, tokens=tokens, subset=val_idx)
         val_shuffle = True
     else:
         if val_seed is None:
-            val_seed= np.random.randint(0, 2**32 - 1)
+            val_seed = np.random.randint(0, 2 ** 32 - 1)
         val_idx, train_idx = split_array(train_idx, val_prop, batch_size, val_seed)
         LOGGER.info(
             f"Splitting training set into a train val set of {len(train_idx)} and "
@@ -223,12 +216,13 @@ def get_oneills_dataloaders(
         )
         train_dataset = ABCDataset(filepath, tokens=tokens, subset=train_idx)
         val_dataset = ABCDataset(filepath, tokens=tokens, subset=val_idx)
-    
+
     pad_idx = test_dataset.tokenizer.pad_token_index
     LOGGER.info(f"Padding token index read as {pad_idx}")
-    
-    _pad_batch = lambda batch: pad_batch(batch, pad_idx=pad_idx)
-    
+
+    def _pad_batch(batch):
+        return pad_batch(batch, pad_idx=pad_idx)
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
