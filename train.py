@@ -21,11 +21,12 @@ Example call:
     python train.py --help
 
     # Rule of thumb is to set --num_workers to the number of cpu cores you have
-    python training/source_separation/train.py \
+    python train.py \
         --num_workers 4 \
         --max_epochs 10 \
-        --model tranformer \
-        --dataset folkrnn
+        --model rnn \
+        --dataset folkrnn \
+        --folkrnn_data_path data/data_v3
 
 # Logs
 Logs will now be available in ./lightning_logs, and viewable with tensorboard at
@@ -33,13 +34,6 @@ localhost:6006 (or whichever port tensorboard started on). You may start tensorb
 by executing:
 
     tensorboard --logdir lightning_logs/
-
-This script also saves all the args the experiment was called with to the
-trainer's logging directory. They can be manually loaded using:
-
-    from double_jig_gen.utils import load_args
-    expt_args_path = "lightning_logs/version_0/experiment_args.json"
-    args = load_args(expt_args_path)
 
 # Checkpoints
 The checkpoints automatically saved by pytorch lightning contain the following keys:
@@ -179,19 +173,17 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
         type=str,
         help="Logging level to set for the logger.",
     )
-    
+
     new_parser.add_argument(
         "--folkrnn_data_path",
         type=str,
         help="Location of the folkrnn data and adjacent splits and vocab files.",
     )
-        
+
     new_parser.add_argument(
-        "--oneills_data_path",
-        type=str,
-        help="Location of the oneills data.",
+        "--oneills_data_path", type=str, help="Location of the oneills data.",
     )
-        
+
     new_parser.add_argument(
         "--val_prop",
         default=0.05,
@@ -305,7 +297,7 @@ if __name__ == "__main__":
         lightning_trainer = pl.Trainer.from_argparse_args(
             args, deterministic=True, early_stop_callback=early_stop_callback
         )
-    
+
     LOGGER.info(f"Loading '{args.dataset}' dataset and getting dataloaders")
     if args.dataset == "folkrnn":
         dataloaders = get_folkrnn_dataloaders(
@@ -315,7 +307,7 @@ if __name__ == "__main__":
             pin_memory=args.pin_memory,
         )
         train_dataloader, val_dataloader, test_dataloader = dataloaders
-    if args.dataset == "oneills":
+    elif args.dataset == "oneills":
         dataloaders = get_oneills_dataloaders(
             filepath=args.oneills_data_path,
             folkrnn_vocab_filepath=str(args.folkrnn_data_path) + "_vocabulary.txt",
@@ -328,8 +320,8 @@ if __name__ == "__main__":
         )
         train_dataloader, val_dataloader, test_dataloader = dataloaders
     else:
-        raise NotImplementedError(f"{args.dataset} is not a configured dataset.")
-    
+        raise NotImplementedError(f"{repr(args.dataset)} is not a configured dataset.")
+
     # modelling args to read from the dataset - same in all datasets
     if args.embedding_padding_idx is None:
         args.embedding_padding_idx = train_dataloader.dataset.tokenizer.pad_token_index
@@ -337,7 +329,7 @@ if __name__ == "__main__":
         args.ntoken = train_dataloader.dataset.vocabulary_size
     if args.model_batch_size is None:
         args.model_batch_size = args.batch_size
-    
+
     # All the keyword arguments for each model are defined within its classmethod
     # .add_model_specific_args() and added to args in parse_and_validate_args() above.
     ModelClass = MODELS[args.model]
@@ -348,8 +340,8 @@ if __name__ == "__main__":
     else:
         # TODO: There's totally a more transparent way of doing this. Look into
         # using inspect.signature to avoid the creation of instantiate_from_namespace.
-        # TODO: currently, we must state ntoken, and embedding_padding_idx from command line
-        #       this should be shifted to being read from dataset
+        # TODO: currently, we must state ntoken, and embedding_padding_idx from command
+        #    line this should be shifted to being read from dataset
         model = ModelClass.instantiate_from_namespace(args)
 
     experiment_args_path = Path(
@@ -362,11 +354,7 @@ if __name__ == "__main__":
     if args.test:
         LOGGER.info("%s Testing (not_training) %s", 30 * "=", 30 * "=")
         lightning_trainer.test(
-            model,
-            test_dataloaders=test_dataloader,
-#             ckpt_path="/disk/scratch_fast/s0816700/logs/lightning_logs/version_23/checkpoints/epoch=95.ckpt",
-#             ckpt_path=str(args.model_load_from_checkpoint),
-            ckpt_path=None,
+            model, test_dataloaders=test_dataloader, ckpt_path=None,
         )
     else:
         LOGGER.info("%s Training %s", 30 * "=", 30 * "=")
