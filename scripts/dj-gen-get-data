@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+REPO_HOME="${1:-${HOME}/git/personal/double-jig-gen}"
+data_home="${REPO_HOME}/data"
+folkrnn_data_dir="${data_home}/folkrnn"
+mkdir -p ${folkrnn_data_dir}
+
+oneills_url="http://www.norbeck.nu/abc/book/oneills/1001/DoubleJig0001-0365.abc"
+printf "Downloading ${oneills_url} to ${data_home}\n"
+# wget ${oneills_url} -P "${data_home}/"
+# N.B. Brackets start a subshell, we return to cwd after closing brace
+(cd ${data_home} && curl -O ${oneills_url})
+
+folkrnn_data_url="https://raw.githubusercontent.com/IraKorshunova/folk-rnn/master/data"
+folkrnn_filenames=(
+    "data_v1"
+    "data_v2"
+    "data_v2_withtitles"
+    "data_v2_worepeats"
+    "data_v3"
+    "midi.tgz"
+)
+for fn in ${folkrnn_filenames[@]}; do
+    data_url=${folkrnn_data_url}/${fn}
+    printf "Downloading ${data_url} to ${folkrnn_data_dir}\n"
+    (cd ${folkrnn_data_dir} && curl -L -O ${data_url})
+done
