@@ -133,8 +133,12 @@ def merge_continuation_lines(lines: Sequence[str]) -> Sequence[str]:
 
 def abc_to_events(abc_str):
     """Converts abc to a list of note events. Times are in number of quavers (quarters)."""
+    # TODO: get position within measure
+    # TODO: get pitch spelling information e.g. position within the scale, and whether
+    #       an accidental is applied *with respect to the scale*
     abc = music21.converter.parse(abc_str, format="abc")
-    # N.B. calling .flat on abc makes offset times stored in not.offset relative to the start of the piece, rather than relative to the containing stream.
+    # N.B. calling .flat on abc makes offset times stored in not.offset relative to the
+    # start of the piece, rather than relative to the containing stream.
     note_stream = abc.flat.getElementsByClass(["Note", "Chord"])
     events = []
     for element in note_stream:
