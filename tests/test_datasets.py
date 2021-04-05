@@ -17,4 +17,6 @@ def valid_abc_paths():
 def test_abcdataset(valid_abc_paths):
     for path in valid_abc_paths:
         dataset = ABCDataset(path)
-        dataset[len(dataset)]
+        assert len(dataset) == 2
+        for ii in range(len(dataset)):
+            dataset[ii]

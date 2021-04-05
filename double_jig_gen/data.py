@@ -1,5 +1,6 @@
 """Dataset preprocessing and item getting classes."""
 import logging
+import re
 from pathlib import Path
 from typing import Callable, Collection, List, Optional, Sequence, Tuple, Union
 
@@ -51,7 +52,11 @@ class ABCDataset:
         if tunes is None:
             self._filepath = filepath
             self.data = read_and_rstrip_file(filepath)
-            self.tunes = [tune.split() for tune in self.data.split("\n\n")]
+            self.tunes = [
+                tune.split()
+                for tune in re.split(r"\n{2,}", self.data)
+                if not (tune.startswith("%") or tune == "")
+            ]
         else:
             self.tunes = tunes
         if subset is not None:
@@ -97,7 +102,11 @@ class ABCDataset:
 class FolkRNNDataset(ABCDataset):
     """Expects vocab and splits files to have been made."""
 
-    def __init__(self, filepath: PATHLIKE, subset_name: Optional[str] = None,) -> None:
+    def __init__(
+        self,
+        filepath: PATHLIKE,
+        subset_name: Optional[str] = None,
+    ) -> None:
         filepath = Path(filepath).resolve()
         with open(f"{str(filepath)}_vocabulary.txt", "r") as file_handle:
             tokens = file_handle.read().splitlines()
@@ -108,12 +117,17 @@ class FolkRNNDataset(ABCDataset):
             subset_indices = None
 
         super().__init__(
-            filepath=filepath, tokens=tokens, subset=subset_indices,
+            filepath=filepath,
+            tokens=tokens,
+            subset=subset_indices,
         )
 
 
 def get_folkrnn_dataloaders(
-    filepath: PATHLIKE, batch_size: int, num_workers: int, pin_memory: bool,
+    filepath: PATHLIKE,
+    batch_size: int,
+    num_workers: int,
+    pin_memory: bool,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """Returns training, validation, and test dataloaders (respectively) for folkrnn.
 
