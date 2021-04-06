@@ -1,9 +1,11 @@
 """Classes which turn strings into lists of tokens."""
 import logging
 import re
-from typing import Collection, List, Mapping, Optional, Sequence, Union
+from typing import Collection, List, Mapping, Optional, Sequence, Tuple, Union
 
 import music21
+import numpy as np
+import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -131,51 +133,6 @@ def merge_continuation_lines(lines: Sequence[str]) -> Sequence[str]:
     return lines
 
 
-def abc_to_events(abc_str):
-    """Converts abc to a list of note events. Times are in number of quavers (quarters)."""
-    # TODO: get position within measure
-    # TODO: get pitch spelling information e.g. position within the scale, and whether
-    #       an accidental is applied *with respect to the scale*
-    abc = music21.converter.parse(abc_str, format="abc")
-    # N.B. calling .flat on abc makes offset times stored in not.offset relative to the
-    # start of the piece, rather than relative to the containing stream.
-    note_stream = abc.flat.getElementsByClass(["Note", "Chord"])
-    events = []
-    for element in note_stream:
-        if isinstance(element, music21.note.Note):
-            accidental_str = (
-                element.pitch.accidental.fullName
-                if element.pitch.accidental is not None
-                else None
-            )
-            events.append(
-                dict(
-                    start=element.offset,
-                    midipitch=element.pitch.ps,
-                    pitch_str=f"{element.name.replace('-', 'b')}{element.octave}",
-                    accidental=accidental_str,
-                    pitch_class=element.pitch.pitchClass,
-                    beat_dur=element.duration.quarterLength,
-                )
-            )
-        if isinstance(element, music21.chord.Chord):
-            for pitch in element.pitches:
-                accidental_str = (
-                    pitch.accidental.fullName if pitch.accidental is not None else None
-                )
-                events.append(
-                    dict(
-                        start=element.offset,
-                        midipitch=pitch.ps,
-                        pitch_str=f"{pitch.name.replace('-', 'b')}{pitch.octave}",
-                        accidental=accidental_str,
-                        pitch_class=pitch.pitchClass,
-                        beat_dur=element.duration.quarterLength,
-                    )
-                )
-    return events
-
-
 # # TODO: keeping since could be useful to parse metadata later
 # def parse_abc(abc_str: str) -> Mapping[str, str]:
 #     """Get the required information from each tune.
@@ -246,10 +203,108 @@ def abc_to_events(abc_str):
 #     return out_dict
 
 
-class ABCParser:
-    """Takes a string containing a single tune, and codifies the information."""
+def abc_to_events(abc_str):
+    """Converts abc to a list of note events.
 
-    def __init__(self, abc_str):
+    Times are in number of quavers (quarters). End times are not inclusive.
+    """
+    # TODO: get position within measure
+    # TODO: get pitch spelling information e.g. position within the scale, and whether
+    #       an accidental is applied *with respect to the scale*
+    abc = music21.converter.parse(abc_str, format="abc")
+    # N.B. calling .flat on abc makes offset times stored in not.offset relative to the
+    # start of the piece, rather than relative to the containing stream.
+    note_stream = abc.flat.getElementsByClass(["Note", "Chord"])
+    events = []
+    for element in note_stream:
+        if isinstance(element, music21.note.Note):
+            accidental_str = (
+                element.pitch.accidental.fullName
+                if element.pitch.accidental is not None
+                else None
+            )
+            events.append(
+                dict(
+                    start=element.offset,
+                    dur=element.duration.quarterLength,
+                    end=element.offset + element.duration.quarterLength,
+                    midipitch=int(element.pitch.ps),
+                    pitch_str=f"{element.name.replace('-', 'b')}{element.octave}",
+                    accidental=accidental_str,
+                    pitch_class=element.pitch.pitchClass,
+                )
+            )
+        if isinstance(element, music21.chord.Chord):
+            for pitch in element.pitches:
+                accidental_str = (
+                    pitch.accidental.fullName if pitch.accidental is not None else None
+                )
+                events.append(
+                    dict(
+                        start=element.offset,
+                        dur=element.duration.quarterLength,
+                        end=element.offset + element.duration.quarterLength,
+                        midipitch=int(pitch.ps),
+                        pitch_str=f"{pitch.name.replace('-', 'b')}{pitch.octave}",
+                        accidental=accidental_str,
+                        pitch_class=pitch.pitchClass,
+                    )
+                )
+    return events
+
+
+def events_to_pianoroll_array(
+    event_list, divisions_per_quarternote=12, min_pitch=None, min_time=None
+) -> Tuple[np.array, int, int]:
+    event_df = pd.DataFrame(event_list)
+
+    if min_pitch is None:
+        min_pitch = event_df["midipitch"].min()
+    event_df.loc[:, "midipitch"] = event_df["midipitch"] - min_pitch
+
+    # time_colnames = ["start", "end", "dur"]
+    time_colnames = ["start", "end"]
+    event_df.loc[:, time_colnames] = (
+        event_df[time_colnames] * divisions_per_quarternote
+    ).astype(int)
+    if min_time is None:
+        min_time = event_df["start"].min()
+    event_df.loc[:, time_colnames] = event_df[time_colnames] - min_time
+
+    height = event_df["midipitch"].max() + 1
+    width = event_df["end"].max()  # end is not inclusive, so don't need to add 1
+    sounding_pr = np.zeros((height, width), dtype=bool)
+    onset_pr = sounding_pr.copy()
+    for start, end, pitch in event_df[["start", "end", "midipitch"]].itertuples(
+        index=False, name=None
+    ):
+        sounding_pr[pitch, start:end] = 1
+        onset_pr[pitch, start] = 1
+    return np.stack((sounding_pr, onset_pr), axis=0), min_pitch, min_time
+
+
+def compress_pianoroll(pr_array, min_pitch) -> np.array:
+    max_time = pr_array.shape[-1]
+    output_array = np.zeros((max_time, 2), dtype=np.uint64)
+    for sounding_or_onset, pitch, time in zip(*np.where(pr_array)):
+        pitch_int = min_pitch + pitch
+        output_array[time, sounding_or_onset] += pitch_int
+    return output_array
+
+
+# TODO: Write uncompressor and tests
+
+
+class ABCParser:
+    """Takes a string containing a single tune and codifies the information."""
+
+    def __init__(
+        self,
+        abc_str,
+        pianoroll_divisions_per_quarternote=12,
+        min_pitch=0,
+        min_time=0,
+    ):
         self.abc_str = abc_str
         self.abc_handler = music21.abcFormat.ABCHandler()
         self.abc_handler.tokenize(self.abc_str)
@@ -260,3 +315,34 @@ class ABCParser:
             if isinstance(token, music21.abcFormat.ABCMetadata)
         ]
         self.events = abc_to_events(abc_str)
+        self.pianoroll_divisions_per_quarternote = pianoroll_divisions_per_quarternote
+        self.min_pitch = min_pitch
+        self.min_time = min_time
+        self._pianoroll = None
+        self._compressed_pianoroll = None
+
+    @property
+    def compressed_pianoroll(self):
+        if self._compressed_pianoroll is None:
+            self.make_compressed_pianoroll()
+        return self._compressed_pianoroll
+
+    @property
+    def pianoroll(self):
+        if self._pianoroll is None:
+            self.make_pianoroll()
+        return self._pianoroll
+
+    def make_pianoroll(self):
+        self._pianoroll, self.min_pitch, self.min_time = events_to_pianoroll_array(
+            self.events,
+            divisions_per_quarternote=self.pianoroll_divisions_per_quarternote,
+            min_pitch=self.min_pitch,
+            min_time=self.min_time,
+        )
+
+    def make_compressed_pianoroll(self):
+        self._compressed_pianoroll = compress_pianoroll(
+            self.pianoroll,
+            min_pitch=self.min_pitch,
+        )
