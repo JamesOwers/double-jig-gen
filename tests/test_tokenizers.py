@@ -1,7 +1,12 @@
 import music21
+import numpy as np
 import pytest
 
-from double_jig_gen.tokenizers import Tokenizer, abc_to_events
+from double_jig_gen.tokenizers import (
+    Tokenizer,
+    abc_to_events,
+    events_to_pianoroll_array,
+)
 
 
 def test_tokenizer():
@@ -171,7 +176,6 @@ def music21_test_examples():
             ],
         }
     )
-
     return examples
 
 
@@ -183,5 +187,63 @@ def test_abc_to_events(music21_test_examples):
         test_results[msg] = out == example["out"]
     assert all(test_results.values()), (
         "abc_to_events produced the incorrect output for: "
+        f"{[key for key, val in test_results.items() if val is False]}"
+    )
+
+
+@pytest.fixture()
+def abc_to_pianoroll_test_examples():
+    examples = []
+    examples.append(
+        {
+            "in": "L:1/16\nV:1\nCC C2\nV:2\nE2 _E^D",
+            "out": (
+                np.array(
+                    [
+                        [
+                            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                        ],
+                        [
+                            [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+                            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        ],
+                    ],
+                    dtype=bool,
+                ),
+                60,
+                0,
+            ),
+        },
+    )
+    return examples
+
+
+def test_abc_to_pianoroll(abc_to_pianoroll_test_examples):
+    test_results = {}
+    for example in abc_to_pianoroll_test_examples:
+        abc_str = example["in"]
+        event_list = abc_to_events(abc_str)
+        out = events_to_pianoroll_array(event_list)
+        msg = (
+            f"events_to_pianoroll_array(abc_to_events('{example['in']}') = {out}\n"
+            f"expected: {example['out']}\n"
+            f"got: {out}"
+        )
+        pianoroll, min_pitch, min_time = out
+        expected_pianoroll, expected_min_pitch, expected_min_time = example["out"]
+        test_results[msg] = (
+            np.array_equal(pianoroll, expected_pianoroll)
+            and min_pitch == expected_min_pitch
+            and min_time == expected_min_time
+        )
+    assert all(test_results.values()), (
+        "events_to_pianoroll_array produced the incorrect output for: "
         f"{[key for key, val in test_results.items() if val is False]}"
     )

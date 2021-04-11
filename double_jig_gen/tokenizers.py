@@ -1,7 +1,17 @@
 """Classes which turn strings into lists of tokens."""
 import logging
 import re
-from typing import Collection, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import music21
 import numpy as np
@@ -203,67 +213,183 @@ def merge_continuation_lines(lines: Sequence[str]) -> Sequence[str]:
 #     return out_dict
 
 
-def abc_to_events(abc_str):
-    """Converts abc to a list of note events.
+def abc_to_events(abc_str: str) -> List[Dict[str, Any]]:
+    """Converts string of abc data to a list of note events.
 
-    Times are in number of quavers (quarters). End times are not inclusive.
+    A note event describes information about a note, such as its start time and pitch.
+    Note event information is stored in a dictionary. The resulting list of events can
+    be read as a pd.DataFrame by wrapping the function output in a pd.DataFrame call
+    e.g. pd.DataFrame(abc_to_events(abc_str)). All times are measured in number of
+    quavers (quarters). End times are not inclusive.
+
+    The parsing of the abc data is handled by music21.converter.parse, therefore the
+    input abc_str must be valid according to this method. See [1] for information about
+    valid abc data.
+
+    For example, an abc tune consisting of a two middle C semiquavers followed by a
+    middle C quaver played at the same time as a concert A quavers followed by two
+    concert A semiquavers could be represented in the following way, and produce the
+    following output:
+
+    >>> abc_str = "L:1/16\nV:1\nCC C2\nV:2\nA2 AA\n"
+    >>> abc_to_events(abc_str)
+    [
+        {
+            "start": 0.0,
+            "duration": 0.25,
+            "pitch": 60,
+            "pitch_str": "C4",
+            "pitch_class": 0,
+            "accidental": None,
+        },
+        {
+            "start": 0.0,
+            "duration": 0.5,
+            "pitch": 69,
+            "pitch_str": "A4",
+            "pitch_class": 9,
+            "accidental": None,
+        },
+        {
+            "start": 0.25,
+            "duration": 0.25,
+            "pitch": 60,
+            "pitch_str": "C4",
+            "pitch_class": 0,
+            "accidental": None,
+        },
+        {
+            "start": 0.5,
+            "duration": 0.5,
+            "pitch": 60,
+            "pitch_str": "C4",
+            "pitch_class": 0,
+            "accidental": None,
+        },
+        {
+            "start": 0.5,
+            "duration": 0.25,
+            "pitch": 69,
+            "pitch_str": "A4",
+            "pitch_class": 9,
+            "accidental": None,
+        },
+        {
+            "start": 0.75,
+            "duration": 0.25,
+            "pitch": 69,
+            "pitch_str": "A4",
+            "pitch_class": 9,
+            "accidental": None,
+        },
+    ]
+
+    Args:
+        abc_str: a string containing valid abc data
+
+    Returns:
+        events: a list of dictionaries. Each dictionary contains information about the
+            note event.
+
+    References:
+    [1]: http://abcnotation.com/wiki/abc:standard:v2.1
     """
     # TODO: get position within measure
     # TODO: get pitch spelling information e.g. position within the scale, and whether
-    #       an accidental is applied *with respect to the scale*
+    # an accidental is applied *with respect to the scale*
     abc = music21.converter.parse(abc_str, format="abc")
-    # N.B. calling .flat on abc makes offset times stored in not.offset relative to the
-    # start of the piece, rather than relative to the containing stream.
+    # N.B. getting flat attr on abc makes offset times stored in a given element.offset
+    # relative to the start of the piece, rather than relative to the containing stream.
     note_stream = abc.flat.getElementsByClass(["Note", "Chord"])
     events = []
     for element in note_stream:
         if isinstance(element, music21.note.Note):
+            pitches = [element.pitch]
+        elif isinstance(element, music21.chord.Chord):
+            pitches = element.pitches
+        for pitch in pitches:
             accidental_str = (
-                element.pitch.accidental.fullName
-                if element.pitch.accidental is not None
-                else None
+                pitch.accidental.fullName if pitch.accidental is not None else None
             )
             events.append(
                 dict(
                     start=element.offset,
-                    dur=element.duration.quarterLength,
-                    end=element.offset + element.duration.quarterLength,
-                    midipitch=int(element.pitch.ps),
-                    pitch_str=f"{element.name.replace('-', 'b')}{element.octave}",
+                    duration=element.duration.quarterLength,
+                    pitch=int(pitch.ps),
+                    pitch_str=f"{pitch.name.replace('-', 'b')}{pitch.octave}",
+                    pitch_class=pitch.pitchClass,
                     accidental=accidental_str,
-                    pitch_class=element.pitch.pitchClass,
                 )
             )
-        if isinstance(element, music21.chord.Chord):
-            for pitch in element.pitches:
-                accidental_str = (
-                    pitch.accidental.fullName if pitch.accidental is not None else None
-                )
-                events.append(
-                    dict(
-                        start=element.offset,
-                        dur=element.duration.quarterLength,
-                        end=element.offset + element.duration.quarterLength,
-                        midipitch=int(pitch.ps),
-                        pitch_str=f"{pitch.name.replace('-', 'b')}{pitch.octave}",
-                        accidental=accidental_str,
-                        pitch_class=pitch.pitchClass,
-                    )
-                )
     return events
 
 
 def events_to_pianoroll_array(
-    event_list, divisions_per_quarternote=12, min_pitch=None, min_time=None
+    event_list: List[Dict[str, Any]],
+    divisions_per_quarternote: int = 12,
+    min_pitch: Optional[int] = None,
+    min_time: Optional[float] = None,
 ) -> Tuple[np.array, int, int]:
+    """Converts list of note events into a pianoroll.
+
+    The list of note events must contain start times (in number of quarters)
+    The resulting pianoroll is of shape: (2, nr_pitches, nr_timepoints) i.e. a stack of
+    2 matrices which are each of shape (nr_pitches, nr_timepoints) the first matrix at
+    index 0 indicates where a pitch should be sounding (1 for sounding, 0 for silent),
+    the second matrix at index 1 indicates where a pitch begins. For example:
+
+    >>> event_list = abc_to_event_list("L:1/16\nV:1\nCC C2\nV:2\nE2 _E^D")
+    >>> pianoroll, min_pitch, min_time = events_to_pianoroll_array(event_list)
+    >>> pianoroll.astype(int)
+    array([[[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]],
+
+           [[1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]])
+    >>> min_pitch
+    60
+    >>> min_time
+    0
+
+    Args:
+        event_list: list of note events. Each note event should be a dictionary with
+            keys "start", "duration", and "pitch", determining the start time of the
+            note, the duration that the note should be held, and the pitch the note
+            should sound at respectively. Times are expected to be in numbers of
+            quarternotes.
+        divisions_per_quarternote: the number of divisions to make per quarternote in
+            the resulting pianoroll i.e. this defines the resolution of the pianoroll.
+            For example, if divisions_per_quarternote is 12, each index in the time axis
+            (the last axis) of the pianoroll will amount to 1/12 quarternotes of time.
+        min_pitch: the integer midinote pitch number of the first index of the pitch
+            axis of the resulting pianoroll. If left the default of None, the minimum
+            pitch found will be used.
+        min_time: the floating point time, in number of quarternotes, of the first index
+            of the time axis of the resulting pianoroll. If left the default of None,
+            the minimum time found will be used.
+
+    Returns:
+        pianoroll: the resulting pianoroll
+        min_pitch: the integer midinote pitch number of the first index of the pitch
+            axis of the resulting pianoroll.
+        min_time: the floating point time, in number of quarternotes, of the first index
+            of the time axis of the resulting pianoroll.
+    """
     event_df = pd.DataFrame(event_list)
-
+    event_df["end"] = event_df["start"] + event_df["duration"]
     if min_pitch is None:
-        min_pitch = event_df["midipitch"].min()
-    event_df.loc[:, "midipitch"] = event_df["midipitch"] - min_pitch
+        min_pitch = event_df["pitch"].min()
+    event_df.loc[:, "pitch"] = event_df["pitch"] - min_pitch
 
-    # time_colnames = ["start", "end", "dur"]
     time_colnames = ["start", "end"]
+    # TODO: check if divisions_per_quarternote is satisfactory (i.e. large enough) and,
+    # if not, throw a warning
     event_df.loc[:, time_colnames] = (
         event_df[time_colnames] * divisions_per_quarternote
     ).astype(int)
@@ -271,11 +397,11 @@ def events_to_pianoroll_array(
         min_time = event_df["start"].min()
     event_df.loc[:, time_colnames] = event_df[time_colnames] - min_time
 
-    height = event_df["midipitch"].max() + 1
+    height = event_df["pitch"].max() + 1
     width = event_df["end"].max()  # end is not inclusive, so don't need to add 1
     sounding_pr = np.zeros((height, width), dtype=bool)
     onset_pr = sounding_pr.copy()
-    for start, end, pitch in event_df[["start", "end", "midipitch"]].itertuples(
+    for start, end, pitch in event_df[["start", "end", "pitch"]].itertuples(
         index=False, name=None
     ):
         sounding_pr[pitch, start:end] = 1
