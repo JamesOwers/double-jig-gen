@@ -17,6 +17,8 @@ import music21
 import numpy as np
 import pandas as pd
 
+from .utils import human_round
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -391,8 +393,10 @@ def events_to_pianoroll_array(
     # TODO: check if divisions_per_quarternote is satisfactory (i.e. large enough) and,
     # if not, throw a warning
     event_df.loc[:, time_colnames] = (
-        event_df[time_colnames] * divisions_per_quarternote
-    ).astype(int)
+        (event_df[time_colnames] * divisions_per_quarternote)
+        .applymap(lambda x: int(human_round(x, 0)))
+        .astype(int)
+    )
     if min_time is None:
         min_time = event_df["start"].min()
     event_df.loc[:, time_colnames] = event_df[time_colnames] - min_time
@@ -409,16 +413,80 @@ def events_to_pianoroll_array(
     return np.stack((sounding_pr, onset_pr), axis=0), min_pitch, min_time
 
 
-def compress_pianoroll(pr_array, min_pitch) -> np.array:
-    max_time = pr_array.shape[-1]
-    output_array = np.zeros((max_time, 2), dtype=np.uint64)
-    for sounding_or_onset, pitch, time in zip(*np.where(pr_array)):
-        pitch_int = min_pitch + pitch
-        output_array[time, sounding_or_onset] += pitch_int
+def compress_pianoroll(pianoroll: np.array) -> np.array:
+    """Compresses a pianoroll into a sequence of integers.
+
+    Compresses the pitch dimension of the pianoroll by encoding it as an integer. The
+    integer is the decimal representation of the bianary number represented by the
+    column. For example:
+
+    >>> abc_str = "L:1/16\nV:1\nCC C2\nV:2\nE2 _E^D\n"
+    >>> pianoroll, min_pitch, min_time = events_to_pianoroll_array(event_list, 8)
+    >>> pianoroll.astype(int)
+    array([[[1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 1, 1, 1],
+            [1, 1, 1, 1, 0, 0, 0, 0]],
+
+           [[1, 0, 1, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0, 0, 0]]])
+    >>> compressed_pianoroll = compress_pianoroll(pianoroll)
+    >>> compressed_pianoroll
+    array([[17, 17, 17, 17,  9,  9,  9,  9],
+           [17,  0,  1,  0,  9,  0,  8,  0]], dtype=uint64)
+
+    At the second to last time point, i.e. compressed_pianoroll[:, -2], we have two
+    numbers: (9, 8). The first represents the pitches sounding: 9 = 2**0 (the pitch at
+    index 0) + 2**3 (the pitch at index 3), which is, in binary, 01001 = 00001 + 01000.
+    Similarly, for the pitches beginning, we have 8 = 2**3, or 01000.
+
+    Args:
+        pianoroll: of shape (2, nr_pitches, nr_timepoints) i.e. a stack of 2 matrices
+            which are each of shape (nr_pitches, nr_timepoints) the first matrix at
+            index 0 indicates where a pitch should be sounding (1 for sounding, 0 for
+            silent), the second matrix at index 1 indicates where a pitch begins.
+        min_pitch: the integer midinote pitch number of the first index of the pitch
+            axis of the input pianoroll.
+
+    Returns:
+        output_array: of shape (2, nr_timepoints)
+    """
+    max_time = pianoroll.shape[-1]
+    output_array = np.zeros((2, max_time), dtype=np.uint64)
+    for sounding_or_onset, pitch, time in zip(*np.where(pianoroll)):
+        pitch_int = 2 ** pitch
+        output_array[sounding_or_onset, time] += pitch_int
     return output_array
 
 
-# TODO: Write uncompressor and tests
+def decompress_pianoroll(compressed_pianoroll: np.array) -> np.array:
+    """Reverses the compression process described in compress_pianoroll."""
+    max_int = np.max(compressed_pianoroll)
+    # int truncates => this is largest power of two <= max_int
+    max_power_of_2 = int(np.log2(max_int))
+    pitch_dimension_size = max_power_of_2 + 1
+
+    def binarise_element(array_element: int) -> np.array:
+        binary_string = np.binary_repr(array_element, width=pitch_dimension_size)
+        integer_data = np.frombuffer(bytes(binary_string, "utf8"), dtype="uint8")
+        big_endian_binary_data = integer_data - ord("0")
+        little_endian_binary_data = big_endian_binary_data[::-1]
+        return little_endian_binary_data
+
+    list_of_binary_arrays = [
+        binarise_element(element) for element in compressed_pianoroll.ravel()
+    ]
+    time_dimension_size = compressed_pianoroll.shape[-1]
+    pianoroll = (
+        np.array(list_of_binary_arrays, dtype=bool)
+        .reshape((2, time_dimension_size, pitch_dimension_size))
+        .swapaxes(1, 2)
+    )
+    return pianoroll
 
 
 class ABCParser:

@@ -5,6 +5,8 @@ import pytest
 from double_jig_gen.tokenizers import (
     Tokenizer,
     abc_to_events,
+    compress_pianoroll,
+    decompress_pianoroll,
     events_to_pianoroll_array,
 )
 
@@ -243,6 +245,22 @@ def test_abc_to_pianoroll(abc_to_pianoroll_test_examples):
             and min_pitch == expected_min_pitch
             and min_time == expected_min_time
         )
+    assert all(test_results.values()), (
+        "events_to_pianoroll_array produced the incorrect output for: "
+        f"{[key for key, val in test_results.items() if val is False]}"
+    )
+
+
+def test_compress_and_decompress_pianoroll(abc_to_pianoroll_test_examples):
+    test_results = {}
+    for example in abc_to_pianoroll_test_examples:
+        pianoroll, _, _ = example["out"]
+        decompressed_pianoroll = decompress_pianoroll(compress_pianoroll(pianoroll))
+        msg = (
+            f"decompress_pianoroll(compress_pianoroll({pianoroll})) = "
+            f"{decompressed_pianoroll}\n"
+        )
+        test_results[msg] = np.array_equal(pianoroll, decompressed_pianoroll)
     assert all(test_results.values()), (
         "events_to_pianoroll_array produced the incorrect output for: "
         f"{[key for key, val in test_results.items() if val is False]}"
