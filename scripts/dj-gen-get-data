@@ -2,7 +2,7 @@
 
 REPO_HOME="${1:-${HOME}/git/personal/double-jig-gen}"
 data_home="${REPO_HOME}/data"
-folkrnn_data_dir="${data_home}/folkrnn"
+folkrnn_data_dir="${data_home}/folk-rnn"
 mkdir -p ${folkrnn_data_dir}
 
 oneills_url="http://www.norbeck.nu/abc/book/oneills/1001/DoubleJig0001-0365.abc"
