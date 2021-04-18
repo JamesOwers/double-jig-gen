@@ -1,4 +1,5 @@
 """Utility functions."""
+import decimal
 import json
 import logging
 from argparse import Namespace
@@ -62,7 +63,8 @@ def load_args(filepath: Union[str, Path]) -> Namespace:
 
 
 def get_trainer_from_checkpoint(
-    ckpt_path: Union[str, Path], **trainer_kwargs,
+    ckpt_path: Union[str, Path],
+    **trainer_kwargs,
 ) -> pl.Trainer:
     """Returns a lightning trainer object loaded with parameters from checkpoint.
 
@@ -102,7 +104,9 @@ def get_model_from_checkpoint(
         model: the instantiated model.
     """
     LOGGER.info(
-        "Restoring model %s using checkpoint %s.", ModelClass.__name__, ckpt_path,
+        "Restoring model %s using checkpoint %s.",
+        ModelClass.__name__,
+        ckpt_path,
     )
     if not Path(ckpt_path).exists():
         raise ValueError(f"Checkpoint file {ckpt_path} doesn't exist.")
@@ -137,8 +141,17 @@ def round_to_nearest_batch_size(
 ):
     float_count = total * prop
     # round to a multiple of batch_size
-    rounded_count = batch_size * max(
-        1,
-        int(np.rint(float_count / batch_size))
-    )
+    rounded_count = batch_size * max(1, int(np.rint(float_count / batch_size)))
     return rounded_count
+
+
+def human_round(x, rounding_level=1, rounding_mode=decimal.ROUND_HALF_UP):
+    """https://realpython.com/python-rounding/"""
+    if isinstance(rounding_level, int):
+        rounding_level = decimal.Decimal(10) ** -rounding_level
+    elif not isinstance(rounding_level, decimal.Decimal):
+        raise ValueError("rounding must be int or decimal.Decimal")
+    decimal_result = decimal.Decimal(str(x)).quantize(
+        rounding_level, rounding=rounding_mode
+    )
+    return decimal_result
