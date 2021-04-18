@@ -1,6 +1,9 @@
 """Classes which turn strings into lists of tokens."""
+import copy
+import inspect
 import logging
 import re
+import textwrap
 from typing import (
     Any,
     Collection,
@@ -13,6 +16,7 @@ from typing import (
     Union,
 )
 
+import matplotlib.pyplot as plt
 import music21
 import numpy as np
 import pandas as pd
@@ -215,17 +219,17 @@ def merge_continuation_lines(lines: Sequence[str]) -> Sequence[str]:
 #     return out_dict
 
 
-def abc_to_events(abc_str: str) -> List[Dict[str, Any]]:
+def abc_to_events(abc_data: str) -> List[Dict[str, Any]]:
     """Converts string of abc data to a list of note events.
 
     A note event describes information about a note, such as its start time and pitch.
     Note event information is stored in a dictionary. The resulting list of events can
     be read as a pd.DataFrame by wrapping the function output in a pd.DataFrame call
-    e.g. pd.DataFrame(abc_to_events(abc_str)). All times are measured in number of
+    e.g. pd.DataFrame(abc_to_events(abc_data)). All times are measured in number of
     quavers (quarters). End times are not inclusive.
 
     The parsing of the abc data is handled by music21.converter.parse, therefore the
-    input abc_str must be valid according to this method. See [1] for information about
+    input abc_data must be valid according to this method. See [1] for information about
     valid abc data.
 
     For example, an abc tune consisting of a two middle C semiquavers followed by a
@@ -233,8 +237,8 @@ def abc_to_events(abc_str: str) -> List[Dict[str, Any]]:
     concert A semiquavers could be represented in the following way, and produce the
     following output:
 
-    >>> abc_str = "L:1/16\nV:1\nCC C2\nV:2\nA2 AA\n"
-    >>> abc_to_events(abc_str)
+    >>> abc_data = "L:1/16\nV:1\nCC C2\nV:2\nA2 AA\n"
+    >>> abc_to_events(abc_data)
     [
         {
             "start": 0.0,
@@ -287,7 +291,7 @@ def abc_to_events(abc_str: str) -> List[Dict[str, Any]]:
     ]
 
     Args:
-        abc_str: a string containing valid abc data
+        abc_data: a string containing valid abc data
 
     Returns:
         events: a list of dictionaries. Each dictionary contains information about the
@@ -299,7 +303,7 @@ def abc_to_events(abc_str: str) -> List[Dict[str, Any]]:
     # TODO: get position within measure
     # TODO: get pitch spelling information e.g. position within the scale, and whether
     # an accidental is applied *with respect to the scale*
-    abc = music21.converter.parse(abc_str, format="abc")
+    abc = music21.converter.parse(abc_data, format="abc")
     # N.B. getting flat attr on abc makes offset times stored in a given element.offset
     # relative to the start of the piece, rather than relative to the containing stream.
     note_stream = abc.flat.getElementsByClass(["Note", "Chord"])
@@ -420,7 +424,8 @@ def compress_pianoroll(pianoroll: np.array) -> np.array:
     integer is the decimal representation of the bianary number represented by the
     column. For example:
 
-    >>> abc_str = "L:1/16\nV:1\nCC C2\nV:2\nE2 _E^D\n"
+    >>> abc_data = "L:1/16\nV:1\nCC C2\nV:2\nE2 _E^D\n"
+    >>> event_list = abc_to_events(abc_data)
     >>> pianoroll, min_pitch, min_time = events_to_pianoroll_array(event_list, 8)
     >>> pianoroll.astype(int)
     array([[[1, 1, 1, 1, 1, 1, 1, 1],
@@ -440,9 +445,10 @@ def compress_pianoroll(pianoroll: np.array) -> np.array:
            [17,  0,  1,  0,  9,  0,  8,  0]], dtype=uint64)
 
     At the second to last time point, i.e. compressed_pianoroll[:, -2], we have two
-    numbers: (9, 8). The first represents the pitches sounding: 9 = 2**0 (the pitch at
-    index 0) + 2**3 (the pitch at index 3), which is, in binary, 01001 = 00001 + 01000.
-    Similarly, for the pitches beginning, we have 8 = 2**3, or 01000.
+    numbers: (9, 8). The first represents the pitches sounding (pianoroll[0, :, :]):
+    2**0 (the pitch at index 0) + 2**3 (the pitch at index 3) = 9 i.e. in binary, thats
+    00001 + 01000 = 01001. Similarly, for the pitches beginning (pianoroll[1, :, :]), we
+    have 2**3 (the pitch at index 3) = 8, i.e. in binary 01000.
 
     Args:
         pianoroll: of shape (2, nr_pitches, nr_timepoints) i.e. a stack of 2 matrices
@@ -460,6 +466,7 @@ def compress_pianoroll(pianoroll: np.array) -> np.array:
     for sounding_or_onset, pitch, time in zip(*np.where(pianoroll)):
         pitch_int = 2 ** pitch
         output_array[sounding_or_onset, time] += pitch_int
+    # TODO: make this a sparse array since most values will be zero
     return output_array
 
 
@@ -489,54 +496,177 @@ def decompress_pianoroll(compressed_pianoroll: np.array) -> np.array:
     return pianoroll
 
 
-class ABCParser:
+class ABCTune:
     """Takes a string containing a single tune and codifies the information."""
 
     def __init__(
         self,
-        abc_str,
+        abc_data,
         pianoroll_divisions_per_quarternote=12,
-        min_pitch=0,
-        min_time=0,
+        min_pitch=None,
+        min_time=None,
+        transpose_semitones=None,
+        transpose_to_pitchclass=None,
     ):
-        self.abc_str = abc_str
-        self.abc_handler = music21.abcFormat.ABCHandler()
-        self.abc_handler.tokenize(self.abc_str)
-        self._tokens_music21 = self.abc_handler.tokens
-        self.metadata = [
+        init_vars = vars()
+        init_method = vars()["self"].__init__
+        self._original_call_args = {
+            arg: init_vars[arg] for arg in inspect.getfullargspec(init_method).args[1:]
+        }
+        if abc_data.strip() == "":
+            raise ValueError("abc_data can't be an empty string")
+        self.abc_data = abc_data
+        self.abc_music21 = music21.converter.parse(abc_data, format="abc")
+        keys = [
+            token
+            for token in self.abc_music21.flat
+            if isinstance(token, music21.key.Key)
+        ]
+        if len(keys) == 0:
+            self.key_guessed = True
+            self.key = self.abc_music21.analyze("key")
+        else:
+            self.key_guessed = False
+            self.key = copy.deepcopy(keys[0])
+        if transpose_to_pitchclass is not None:
+            if transpose_semitones is not None:
+                raise ValueError(
+                    "Don't use both transpose_semitones and transpose_to_pitchclass"
+                )
+            # This gets the shortest distance between the tonic and the pitchclass i.e.
+            # will be negative if transposing down is a shorter distance than up
+            transpose_semitones = music21.interval.Interval(
+                self.key.tonic, music21.pitch.Pitch(transpose_to_pitchclass)
+            ).semitones
+        self.transpose_semitones = transpose_semitones
+        if transpose_semitones is not None and transpose_semitones != 0:
+            self.original_key = copy.deepcopy(self.key)
+            self.original_abc_music21 = copy.deepcopy(self.abc_music21)
+            self.abc_music21.transpose(transpose_semitones, inPlace=True)
+            self.key = self.key.transpose(transpose_semitones)
+            self.transposed = True
+        else:
+            self.transposed = False
+            self.original_key = self.key
+            self.original_abc_music21 = self.abc_music21
+        # TODO: currently have to fall back on ABCHandler to get metadata because
+        # self.abc_music21 has "cleverly" parsed this information and lost some. See
+        # self.abc_music21.metadata.all() to see what the parser has retained (time
+        # signatures and key signatures have been added to the stream instead)
+        self._abc_handler = music21.abcFormat.ABCHandler()
+        self._abc_handler.tokenize(self.abc_data)
+        self.raw_metadata = [
             token.src
-            for token in self._tokens_music21
+            for token in self._abc_handler.tokens
             if isinstance(token, music21.abcFormat.ABCMetadata)
         ]
-        self.events = abc_to_events(abc_str)
-        self.pianoroll_divisions_per_quarternote = pianoroll_divisions_per_quarternote
-        self.min_pitch = min_pitch
-        self.min_time = min_time
+        self.metadata = {}
+        for token in self.raw_metadata:
+            meta_key, value = token.split(":", 1)
+            value = value.strip()
+            field_name = ABC_FIELDS[meta_key]
+            if field_name in self.metadata:
+                existing_value = self.metadata[field_name]
+                if not isinstance(existing_value, list):
+                    self.metadata[field_name] = [existing_value]
+                self.metadata[field_name] += [value]
+            else:
+                self.metadata[field_name] = value
+        self._events = None
+        self._pianoroll_divisions_per_quarternote = pianoroll_divisions_per_quarternote
+        self._min_pitch = min_pitch
+        self._min_time = min_time
         self._pianoroll = None
         self._compressed_pianoroll = None
+
+    def __repr__(self):
+        args_str = ",\n".join(
+            f"{arg}={repr(value)}" for arg, value in self._original_call_args.items()
+        )
+        object_instantiation_str = textwrap.dedent(
+            f"""
+            ABCTune(\n{textwrap.indent(args_str, 16 * ' ')},
+            )
+            """
+        ).strip()
+        return object_instantiation_str
+
+    def __str__(self):
+        type_ = type(self)
+        module = type_.__module__
+        qualname = type_.__qualname__
+        object_desc_str = (
+            f"<{module}.{qualname} object at {hex(id(self))}> from abc_data:\n"
+            f"{textwrap.indent(self.abc_data, 4 * ' ')}"
+        )
+        return object_desc_str
+
+    @property
+    def events(self):
+        if self._events is None:
+            self._events = abc_to_events(self.abc_data)
+        return self._events
+
+    @property
+    def key_str(self):
+        return f"{self.key.tonic} {self.key.mode}"
 
     @property
     def compressed_pianoroll(self):
         if self._compressed_pianoroll is None:
-            self.make_compressed_pianoroll()
+            self._make_compressed_pianoroll()
         return self._compressed_pianoroll
 
     @property
     def pianoroll(self):
         if self._pianoroll is None:
-            self.make_pianoroll()
+            self._make_pianoroll()
         return self._pianoroll
 
-    def make_pianoroll(self):
-        self._pianoroll, self.min_pitch, self.min_time = events_to_pianoroll_array(
+    @property
+    def min_pitch(self):
+        if self._min_pitch is None:
+            self._make_pianoroll()
+        return self._min_pitch
+
+    @property
+    def min_time(self):
+        if self._min_time is None:
+            self._make_pianoroll()
+        return self._min_time
+
+    def _make_pianoroll(self):
+        self._pianoroll, self._min_pitch, self._min_time = events_to_pianoroll_array(
             self.events,
-            divisions_per_quarternote=self.pianoroll_divisions_per_quarternote,
-            min_pitch=self.min_pitch,
-            min_time=self.min_time,
+            divisions_per_quarternote=self._pianoroll_divisions_per_quarternote,
+            min_pitch=self._min_pitch,
+            min_time=self._min_time,
         )
 
-    def make_compressed_pianoroll(self):
-        self._compressed_pianoroll = compress_pianoroll(
-            self.pianoroll,
-            min_pitch=self.min_pitch,
-        )
+    def _make_compressed_pianoroll(self):
+        self._compressed_pianoroll = compress_pianoroll(self.pianoroll)
+
+    def play(self):
+        music21.midi.realtime.StreamPlayer(self.abc_music21).play()
+
+    def show(self):
+        self.abc_music21.show()
+
+    def plot_pianoroll(self):
+        _, subplot_axis = plt.subplots(1, 2, figsize=(12, 4), sharex=True, sharey=True)
+        titles = ["sounding", "onset"]
+        for index in range(self.pianoroll.shape[0]):
+            ax = subplot_axis[index]
+            ax.matshow(self.pianoroll[index], origin="lower", aspect="auto")
+            ax.set_title(titles[index])
+        for ax in subplot_axis:
+            ax.xaxis.tick_bottom()
+            ax.set_xlabel(
+                f"time (1/{self._pianoroll_divisions_per_quarternote} quarternote "
+                "durations)"
+            )
+            ax.set_ylabel("pitch number")
+            ax.set_yticks([ii for ii in range(self.pianoroll.shape[1])])
+            ax.set_yticklabels(
+                [tick_number + self.min_pitch for tick_number in ax.get_yticks()]
+            )
