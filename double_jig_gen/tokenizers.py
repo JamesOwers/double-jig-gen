@@ -1,9 +1,12 @@
 """Classes which turn strings into lists of tokens."""
 import copy
+import fractions
 import inspect
 import logging
 import re
+import sys
 import textwrap
+from io import StringIO
 from typing import (
     Any,
     Collection,
@@ -219,6 +222,7 @@ def merge_continuation_lines(lines: Sequence[str]) -> Sequence[str]:
 #     return out_dict
 
 
+# TODO: I don't think this handles repeats correctly...
 def abc_to_events(abc_data: str) -> List[Dict[str, Any]]:
     """Converts string of abc data to a list of note events.
 
@@ -496,6 +500,52 @@ def decompress_pianoroll(compressed_pianoroll: np.array) -> np.array:
     return pianoroll
 
 
+def music21_note_to_abc_str(
+    music21_note: music21.note.Note,
+    abc_unit_note_length_in_quarters: float,
+):
+    duration_in_quarters = music21_note.duration.quarterLength
+    duration_in_abc_unit_note_lengths = (
+        duration_in_quarters / abc_unit_note_length_in_quarters
+    )
+    duration_as_fraction = fractions.Fraction(
+        duration_in_abc_unit_note_lengths
+    ).limit_denominator(max_denominator=12)
+    duration_str = str(duration_as_fraction)  # noqa
+    # TODO: finish this
+
+
+def music21_stream_to_abc_tokens(
+    stream: music21.stream,
+    ignore_types: Tuple[Any] = (music21.metadata.Metadata, music21.clef.Clef),
+) -> List[str]:
+    token_list = []  # noqa
+    # TODO: finish this
+    for token in stream.flat:
+        if isinstance(token, ignore_types):
+            pass
+        elif isinstance(token, music21.note.Note):
+            pass
+
+
+class CapturingStderr(list):
+    def __enter__(self):
+        self._stderr = sys.stderr
+        sys.stderr = self._stringio = StringIO()
+        return self
+
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio
+        sys.stderr = self._stderr
+
+
+class ABCTuneError(Exception):
+    """Exception class for ABCTune."""
+
+    pass
+
+
 class ABCTune:
     """Takes a string containing a single tune and codifies the information."""
 
@@ -514,9 +564,21 @@ class ABCTune:
             arg: init_vars[arg] for arg in inspect.getfullargspec(init_method).args[1:]
         }
         if abc_data.strip() == "":
-            raise ValueError("abc_data can't be an empty string")
+            raise ABCTuneError("abc_data can't be an empty string")
         self.abc_data = abc_data
-        self.abc_music21 = music21.converter.parse(abc_data, format="abc")
+        try:
+            with CapturingStderr() as music21_warnings:
+                self.abc_music21 = music21.converter.parse(abc_data, format="abc")
+        except Exception as e:
+            raise ABCTuneError(
+                f"music21.converter.parse({repr(abc_data)}, format='abc') failed:\n"
+                f"{repr(e)}"
+            )
+        if music21_warnings:
+            raise ABCTuneError(
+                f"music21.converter.parse({repr(abc_data)}, format='abc') raised "
+                f"warnings, this usually leads to incorrect data:\n{music21_warnings}"
+            )
         keys = [
             token
             for token in self.abc_music21.flat
@@ -564,7 +626,10 @@ class ABCTune:
         for token in self.raw_metadata:
             meta_key, value = token.split(":", 1)
             value = value.strip()
-            field_name = ABC_FIELDS[meta_key]
+            if meta_key in ABC_FIELDS:
+                field_name = ABC_FIELDS[meta_key]
+            else:
+                field_name = f"Unexpected field {repr(meta_key)}"
             if field_name in self.metadata:
                 existing_value = self.metadata[field_name]
                 if not isinstance(existing_value, list):
@@ -578,6 +643,7 @@ class ABCTune:
         self._min_time = min_time
         self._pianoroll = None
         self._compressed_pianoroll = None
+        self._tokens = None
 
     def __repr__(self):
         args_str = ",\n".join(
@@ -635,6 +701,12 @@ class ABCTune:
             self._make_pianoroll()
         return self._min_time
 
+    @property
+    def tokens(self):
+        if self._tokens is None:
+            self._get_tokens()
+        return self._tokens
+
     def _make_pianoroll(self):
         self._pianoroll, self._min_pitch, self._min_time = events_to_pianoroll_array(
             self.events,
@@ -646,11 +718,26 @@ class ABCTune:
     def _make_compressed_pianoroll(self):
         self._compressed_pianoroll = compress_pianoroll(self.pianoroll)
 
+    def _get_tokens(self):
+        # TODO - handle transposition. Either:
+        # a) write a parser from music21 notation to tokens - these tokens could be abc
+        # or whatever, the only catch is that we need to be able to convert back to
+        # music21 afterwards (else model generations will be useless). To do this, will
+        # need to traverse the stream e.g. using stream.recurse() or like .show("text"),
+        # and get the *constructors* for each object (we don't want the model to care
+        # about absolute time, only relative).
+        # b) use the abc_handler and transpose tokens manually - this is non-trivial
+        # since the key metadata must be handled.
+        self._tokens = [
+            token if hasattr(token, "src") else str(token)
+            for token in self._abc_handler.tokens
+        ]
+
     def play(self):
         music21.midi.realtime.StreamPlayer(self.abc_music21).play()
 
-    def show(self):
-        self.abc_music21.show()
+    def show(self, *args, **kwargs):
+        self.abc_music21.show(*args, **kwargs)
 
     def plot_pianoroll(self):
         _, subplot_axis = plt.subplots(1, 2, figsize=(12, 4), sharex=True, sharey=True)
@@ -670,3 +757,23 @@ class ABCTune:
             ax.set_yticklabels(
                 [tick_number + self.min_pitch for tick_number in ax.get_yticks()]
             )
+
+
+# TODO: construct music21 score from sequence of constructors:
+# Want to be able to go from a list constaining constructors for measures and notes
+# to a music21 score e.g. input:
+# abc_tune = ABCTune("T: maitune\nM:3/4\nL:1/8\n|: [ACE]2B2D2 | [ceg]6 | [1 (3ABC (3DEF (3GAB :| [2 (3ABC (3DEF (3GAe |]")
+# [tok for tok in abc_tune.abc_music21.flat]
+
+# Can construct like this
+# score = music21.stream.Score()
+# part = music21.stream.Part()
+# nr_measures = 4
+# for _ in range(nr_measures):
+#     measure = music21.stream.Measure()
+#     notes = (("A", 1), ("B-", 0.5), ("C#", 1.5))
+#     for pitch_name, quarter_length in notes:
+#         measure.append(music21.note.Note(pitch_name, quarterLength=quarter_length))
+#     part.append(measure)
+# score.insert(0, part)
+# score.show("text")

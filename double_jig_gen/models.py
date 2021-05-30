@@ -19,9 +19,10 @@ from tqdm import tqdm
 
 class SimpleRNN(pl.LightningModule):
     """Container module with an encoder, a recurrent module, and a decoder.
-    
+
     Taken from https://github.com/pytorch/examples/blob/master/word_language_model/model.py
     """
+
     # TODO: Make it such that these are populated in the init call - it will
     #       cause bugs to write kwargs in two places.
     # Argparse settings
@@ -42,7 +43,7 @@ class SimpleRNN(pl.LightningModule):
         "optimizer": {"default": "Adam", "type": str},
         "scheduler": {"default": "ReduceLROnPlateau", "type": str},
     }
-    
+
     @classmethod
     def instantiate_from_namespace(cls, args):
         kwargs = {kk: vv for kk, vv in vars(args).items() if kk in cls._hparam_defaults}
@@ -55,7 +56,7 @@ class SimpleRNN(pl.LightningModule):
         for arg_name, arg_kwargs in cls._hparam_defaults.items():
             parser.add_argument(f"--{arg_name}", **arg_kwargs)
         return parser
-    
+
     def __init__(
         self,
         rnn_type,
@@ -76,7 +77,7 @@ class SimpleRNN(pl.LightningModule):
         scheduler: Optional[str] = None,
     ):
         """Initialises the model.
-        
+
         Args:
             rnn_type: 'LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU'
             ntoken: number of tokens in the input vocabulary, size of the embedding
@@ -103,7 +104,7 @@ class SimpleRNN(pl.LightningModule):
         # This creates the attribute `hparams` for pytorch_lightning. This is used in
         # saving parameters to the logs and for reloading from checkpoints
         self.save_hyperparameters()
-        
+
         self.model_batch_size = model_batch_size
         self.embedding_padding_idx = embedding_padding_idx
         self.ntoken = ntoken
@@ -114,7 +115,7 @@ class SimpleRNN(pl.LightningModule):
             padding_idx=embedding_padding_idx,
         )
         # TODO: think about how to use a bi-directional lstm
-        if rnn_type in ['LSTM', 'GRU']:
+        if rnn_type in ["LSTM", "GRU"]:
             self.rnn_layer = getattr(nn, rnn_type)(
                 input_size=ninp,
                 hidden_size=nhid,
@@ -124,18 +125,21 @@ class SimpleRNN(pl.LightningModule):
             )
         else:
             try:
-                nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
+                nonlinearity = {"RNN_TANH": "tanh", "RNN_RELU": "relu"}[rnn_type]
             except KeyError:
-                raise ValueError( """An invalid option for `--model` was supplied,
-                                 options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
-            self.rnn_layer = nn.RNN(input_size=ninp,
+                raise ValueError(
+                    """An invalid option for `--model` was supplied,
+                                 options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']"""
+                )
+            self.rnn_layer = nn.RNN(
+                input_size=ninp,
                 hidden_size=nhid,
                 num_layers=nlayers,
                 dropout=dropout,
                 nonlinearity=nonlinearity,
                 batch_first=False,
             )
-            
+
         self.decoder_layer = nn.Linear(nhid, ntoken)
 
         # Optionally tie weights as in:
@@ -146,7 +150,9 @@ class SimpleRNN(pl.LightningModule):
         # https://arxiv.org/abs/1611.01462
         if tie_weights:
             if nhid != ninp:
-                raise ValueError('When using the tied flag, nhid must be equal to emsize')
+                raise ValueError(
+                    "When using the tied flag, nhid must be equal to emsize"
+                )
             self.decoder_layer.weight = self.encoder.weight
 
         self.init_weights()
@@ -154,7 +160,7 @@ class SimpleRNN(pl.LightningModule):
         self.rnn_type = rnn_type
         self.nhid = nhid
         self.nlayers = nlayers
-        
+
         # Pytorch Lightning args
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -162,7 +168,9 @@ class SimpleRNN(pl.LightningModule):
         self.lr_decay_patience = lr_decay_patience
         self.OptimizerClass = getattr(torch.optim, optimizer)
         self.optimizer = self.OptimizerClass(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay,
+            self.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
         )
         if scheduler is not None:
             self.SchedulerClass = getattr(torch.optim.lr_scheduler, scheduler)
@@ -182,14 +190,14 @@ class SimpleRNN(pl.LightningModule):
 
     def forward(self, padded_batch, seq_lengths):
         """padded batch of shape seq_len, batch_size"""
-        
+
         batch_seq_len, batch_size = padded_batch.shape
         self.hidden = self.init_hidden(batch_size)
-        # max_seq_len, batch_size, embedding_size 
+        # max_seq_len, batch_size, embedding_size
         outputs = self.encoder_layer(padded_batch)
         outputs = self.dropout_layer(outputs)
-        
-        # https://gist.github.com/HarshTrivedi/f4e7293e941b17d19058f6fb90ab0fec
+
+        #  https://gist.github.com/HarshTrivedi/f4e7293e941b17d19058f6fb90ab0fec
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         outputs = torch.nn.utils.rnn.pack_padded_sequence(
             outputs,
@@ -203,13 +211,13 @@ class SimpleRNN(pl.LightningModule):
             outputs,
             batch_first=False,
         )
-        
+
         outputs = outputs.contiguous()
         outputs = self.dropout_layer(outputs)
         outputs = self.decoder_layer(outputs)
         outputs = outputs.view(-1, self.ntoken)
         outputs = F.log_softmax(outputs, dim=1)
-        
+
         nr_trailing_pad_rows = batch_seq_len - max(seq_lengths)
         if nr_trailing_pad_rows == 0:
             outputs = outputs.view(batch_seq_len, batch_size, self.ntoken)
@@ -228,21 +236,14 @@ class SimpleRNN(pl.LightningModule):
     def init_hidden(self, batch_size=None):
         if batch_size is None:
             batch_size = self.model_batch_size
-        hidden_a = torch.randn(self.nlayers, batch_size, self.nhid)
-        hidden_b = torch.randn(self.nlayers, batch_size, self.nhid)
-        
-#         if self.hparams.on_gpu:
-        # TODO: fix this hack to make work on CPU too. Need to work out how to get
-        # device info from pytorch_lightning when .forward() is called.
-        if True:
-            hidden_a = hidden_a.cuda()
-            hidden_b = hidden_b.cuda()
-            
-        if self.rnn_type == 'LSTM':
+        hidden_a = torch.randn(self.nlayers, batch_size, self.nhid, device=self.device)
+        hidden_b = torch.randn(self.nlayers, batch_size, self.nhid, device=self.device)
+
+        if self.rnn_type == "LSTM":
             return hidden_a, hidden_b
         else:
             return hidden_a
-    
+
     def loss(self, outputs, padded_batch):
         """padded batch of shape seq_len, batch_size. outputs are next step preds shape
         seq_len, batch_size, vocab_size. seq_lengths include both start and end tokens."""
@@ -262,7 +263,7 @@ class SimpleRNN(pl.LightningModule):
         ce_loss = -torch.sum(outputs) / nr_tokens
 
         return ce_loss
-    
+
     def _step(self, batch):
         """Takes a forward pass step on the batch and returns the loss."""
         padded_data, seq_lengths = batch
@@ -319,19 +320,18 @@ class SimpleRNN(pl.LightningModule):
         with torch.no_grad():
             predictions = self(padded_batch, seq_lengths)
             next_predictions = predictions[
-                np.array(seq_lengths) - 1,
-                range(predictions.shape[1])
+                np.array(seq_lengths) - 1, range(predictions.shape[1])
             ]
             log_probs, tokens = torch.topk(next_predictions, k=topk)
             if sample_type == "equal":
-                idx = torch.randint(low=0, high=topk, size=token_indexes.shape[0])
+                idx = torch.randint(low=0, high=topk, size=tokens.shape[0])
             elif sample_type == "proportional":
                 probs = F.softmax(log_probs, dim=-1) / temperature
                 idx = probs.multinomial(num_samples=1).squeeze()
             next_tokens = tokens[range(tokens.shape[0]), idx]
-        
+
         return next_tokens
-    
+
     def generate_tunes(
         self,
         sequences,
@@ -341,7 +341,7 @@ class SimpleRNN(pl.LightningModule):
         tokenizer=None,
         top_k=5,
         sample_type="proportional",
-        temperature=1.0, 
+        temperature=1.0,
     ):
         """"""
         is_training = self.training
@@ -353,7 +353,7 @@ class SimpleRNN(pl.LightningModule):
             end_token_idx = tokenizer.end_token_index
         for ii in tqdm(range(max_nr_generation_steps)):
             next_tokens = self.generate_next_token(
-                sequences[:, still_generating], 
+                sequences[:, still_generating],
                 sequence_lengths[still_generating],
                 topk=top_k,
                 sample_type=sample_type,
@@ -382,7 +382,7 @@ class SimpleRNN(pl.LightningModule):
         if is_training:
             self.train()
         return generations, sequence_lengths
-        
+
 
 class Transformer(pl.LightningModule):
     def __init__(self):
@@ -395,6 +395,3 @@ class Transformer(pl.LightningModule):
     @classmethod
     def add_model_specific_args(cls, parent_parser):
         pass
-
-    
-    

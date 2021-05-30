@@ -16,11 +16,42 @@ from double_jig_gen.utils import round_to_nearest_batch_size
 LOGGER = logging.getLogger(__name__)
 
 
+def fix_encoding_errors(tune_str: str) -> str:
+    encoding_errors = {
+        "â\x80\x99": "'",
+        "Â\xa0": "'",
+    }
+    for decoded_str, replacement_str in encoding_errors.items():
+        tune_str = (
+            bytes(tune_str, "utf-8")
+            .replace(
+                decoded_str.encode("utf8"),
+                replacement_str.encode("utf-8"),
+            )
+            .decode("utf-8")
+        )
+    return tune_str
+
+
+def remove_quoted_strings(tune_str: str) -> str:
+    try:
+        tune_str = re.sub('"([^"]*)"', "", tune_str, count=0, flags=0)
+    except TypeError as e:
+        print(f"{type(tune_str)=}")
+        print(f"{tune_str=}")
+        print(f"{e=}")
+    return tune_str
+
+
 def pad_batch(batch, pad_idx):
     "Function which adds padding to each batch up to the longest sequence."
     lengths = [seq.shape[0] for seq in batch]
     data = pad_sequence(batch, batch_first=False, padding_value=pad_idx)
     return data, lengths
+
+
+def default_pad_batch(batch):
+    return pad_batch(batch, pad_idx=0)
 
 
 # TODO: enable adding them together trivially

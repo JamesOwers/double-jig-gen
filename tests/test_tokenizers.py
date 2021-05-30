@@ -8,6 +8,7 @@ import pytest
 
 from double_jig_gen.tokenizers import (
     ABCTune,
+    ABCTuneError,
     Tokenizer,
     abc_to_events,
     compress_pianoroll,
@@ -377,12 +378,20 @@ def test_ABCTune_pianoroll(abctune_examples):
 
 
 def test_ABCTune_invalid_abc():
-    with pytest.raises(ValueError):
+    with pytest.raises(ABCTuneError):
         ABCTune("")
-    with pytest.raises(ValueError):
+    with pytest.raises(ABCTuneError):
         ABCTune(" ")
-    with pytest.raises(music21.abcFormat.ABCHandlerException):
+    with pytest.raises(ABCTuneError):
         ABCTune("A")
+
+
+def test_ABCTune_invalid_metadata():
+    # http://abcnotation.com/wiki/abc:standard:v2.1#outdated_syntax
+    invalid_field = "E"
+    abc_data = f"{invalid_field}: oh no\nL: 1/8\nA"
+    abc_tune = ABCTune(abc_data)
+    assert f"Unexpected field {repr(invalid_field)}" in abc_tune.metadata
 
 
 def test_ABCTune_play():
@@ -393,6 +402,7 @@ def test_ABCTune_play():
 def test_ABCTune_show(abctune_examples):
     abc_data = "L:1/8\nA"
     ABCTune(abc_data).show()
+    ABCTune(abc_data).show("text")
 
 
 def test_ABCTune_plot_pianoroll(abctune_examples):
