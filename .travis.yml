@@ -13,6 +13,9 @@ before_install:
 install:
   - pip install .
   - pip install codecov  # only required for `after_success`
+  - curl -L https://cdn.jsdelivr.net/musescore/v3.6.2/MuseScore-3.6.2.548021370-x86_64.AppImage --output musescore-x86_64.AppImage
+  - chmod u+x musescore-x86_64.AppImage
+  - ./musescore-x86_64.AppImage
 # command to run tests - the required packages, pytest-runner, pytest, and pytest-cov
 # are installed as configured in setup.cfg under setup_requires and tests_require
 script:
