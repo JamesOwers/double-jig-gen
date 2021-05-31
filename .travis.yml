@@ -14,7 +14,7 @@ install:
   - pip install .
   - pip install codecov  # only required for `after_success`
   - sudo apt-get update
-  - sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable
+  - sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable -y
   - sudo apt-get install musescore3
   # - curl -L https://cdn.jsdelivr.net/musescore/v3.6.2/MuseScore-3.6.2.548021370-x86_64.AppImage --output musescore-x86_64.AppImage
   # - chmod u+x musescore-x86_64.AppImage
