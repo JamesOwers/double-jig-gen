@@ -734,7 +734,10 @@ class ABCTune:
         ]
 
     def play(self):
-        music21.midi.realtime.StreamPlayer(self.abc_music21).play()
+        try:
+            music21.midi.realtime.StreamPlayer(self.abc_music21).play()
+        except Exception as e:
+            LOGGER.warning(f"pygame couldn't play midi: {e}")
 
     def show(self, *args, **kwargs):
         try:
