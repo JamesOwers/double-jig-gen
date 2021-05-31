@@ -34,12 +34,7 @@ def fix_encoding_errors(tune_str: str) -> str:
 
 
 def remove_quoted_strings(tune_str: str) -> str:
-    try:
-        tune_str = re.sub('"([^"]*)"', "", tune_str, count=0, flags=0)
-    except TypeError as e:
-        print(f"{type(tune_str)=}")
-        print(f"{tune_str=}")
-        print(f"{e=}")
+    tune_str = re.sub('"([^"]*)"', "", tune_str, count=0, flags=0)
     return tune_str
 
 
