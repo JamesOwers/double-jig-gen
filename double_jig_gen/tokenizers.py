@@ -734,10 +734,17 @@ class ABCTune:
         ]
 
     def play(self):
-        music21.midi.realtime.StreamPlayer(self.abc_music21).play()
+        try:
+            music21.midi.realtime.StreamPlayer(self.abc_music21).play()
+        except Exception as e:
+            LOGGER.warning(f"pygame couldn't play midi: {e}")
 
     def show(self, *args, **kwargs):
-        self.abc_music21.show(*args, **kwargs)
+        try:
+            self.abc_music21.show(*args, **kwargs)
+        except Exception as e:
+            LOGGER.warning(f"You probably need to install musescore, got {e}")
+            self.abc_music21.show("text")
 
     def plot_pianoroll(self):
         _, subplot_axis = plt.subplots(1, 2, figsize=(12, 4), sharex=True, sharey=True)
