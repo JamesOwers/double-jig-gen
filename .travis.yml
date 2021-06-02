@@ -15,10 +15,12 @@ install:
   - pip install .
   - pip install codecov  # only required for `after_success`
 # TODO: install musescore/lilypond for png scores
-  - sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable -y
-  - sudo apt-get update
-  - sudo apt-get install xfvb
-  - xfvb-run sudo apt-get install musescore3
+  - sudo apt-get build-dep lilypond
+  - sudo apt-get install autoconf fonts-texgyre texlive-lang-cyrillic
+  # - sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable -y
+  # - sudo apt-get update
+  # - sudo apt-get install xfvb
+  # - xfvb-run sudo apt-get install musescore3
   # - curl -L https://cdn.jsdelivr.net/musescore/v3.6.2/MuseScore-3.6.2.548021370-x86_64.AppImage --output musescore-x86_64.AppImage
   # - chmod u+x musescore-x86_64.AppImage
   # - ./musescore-x86_64.AppImage
