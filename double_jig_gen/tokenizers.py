@@ -743,7 +743,9 @@ class ABCTune:
         try:
             self.abc_music21.show(*args, **kwargs)
         except Exception as e:
-            LOGGER.warning(f"You probably need to install musescore, got {e}")
+            LOGGER.warning(
+                f"You probably need to install musescore, got {type(e)}:\n{e}"
+            )
             self.abc_music21.show("text")
 
     def plot_pianoroll(self):
