@@ -14,9 +14,10 @@ before_install:
 install:
   - pip install .
   - pip install codecov  # only required for `after_success`
-# TODO: install musescore/lilypond for png scores
   - sudo apt-get build-dep lilypond
   - sudo apt-get install autoconf fonts-texgyre texlive-lang-cyrillic
+  # - curl -L https://lilypond.org/download/binaries/linux-64/lilypond-2.22.1-1.linux-64.sh --output lilypond-2.22.1-1.linux-64.sh
+  # - sh lilypond-2.22.1-1.linux-64.sh
   # - sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable -y
   # - sudo apt-get update
   # - sudo apt-get install xfvb
