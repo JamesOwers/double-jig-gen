@@ -98,6 +98,12 @@ class ABCDataset:
         ]
         self.nr_tunes = len(self.tunes)
         self.tune_lengths = [len(tune) for tune in self.tokenized_tunes]
+        self.nr_unk_tokens = sum(
+            1
+            for tune in self.tokenized_tunes
+            for token in tune
+            if token == self.tokenizer.pad_token_index
+        )
         self.mean_tune_len = np.mean(self.tune_lengths)
         self.median_tune_len = np.median(self.tune_lengths)
         self.max_tune_len = np.max(self.tune_lengths)
@@ -109,11 +115,14 @@ class ABCDataset:
         msg = (
             f"vocabulary size: {self.vocabulary_size}\n"
             f"vocabulary (each token separated by a space): \n{' '.join(tokens)}\n"
-            f"dataset_size: {len(self)}\n"
-            f"tune length stats:\n\t* max {self.max_tune_len}"
-            f"\n\t* mean {self.mean_tune_len}"
-            f"\n\t* median {self.median_tune_len}"
-            f"\n\t* min {self.min_tune_len}"
+            f"dataset size: {len(self)}\n"
+            f"special tokens: {self.tokenizer.special_tokens}\n"
+            f"nr <unk> tokens: {self.nr_unk_tokens}\n"
+            "tune length stats:\n"
+            f"\t* max {self.max_tune_len}\n"
+            f"\t* mean {self.mean_tune_len}\n"
+            f"\t* median {self.median_tune_len}\n"
+            f"\t* min {self.min_tune_len}"
         )
         return msg
 
