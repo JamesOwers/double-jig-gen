@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 REPO_HOME="${HOME}/git/double-jig-gen"
-data_home="${1:-${REPO_HOME}/data}"
+data_home="${1:-${REPO_HOME}/data/raw}"
 folkrnn_data_dir="${data_home}/folk-rnn"
 mkdir -p ${folkrnn_data_dir}
 
