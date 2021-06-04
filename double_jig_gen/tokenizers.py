@@ -546,6 +546,14 @@ class ABCTuneError(Exception):
     pass
 
 
+def get_ipython_shell_name():
+    try:
+        ipython_shell_name = get_ipython().__class__.__name__
+    except NameError:
+        ipython_shell_name = None
+    return ipython_shell_name
+
+
 class ABCTune:
     """Takes a string containing a single tune and codifies the information."""
 
@@ -734,6 +742,7 @@ class ABCTune:
         ]
 
     def play(self):
+        # TODO: play with fluidsynth https://colab.research.google.com/drive/1JhBYXov4d6RpXsPDNZmhnJX6rrZ8_p2v?usp=sharing#scrollTo=9JBRee7BtvVL
         try:
             music21.midi.realtime.StreamPlayer(self.abc_music21).play()
         except Exception as e:
@@ -742,11 +751,33 @@ class ABCTune:
     def show(self, *args, **kwargs):
         try:
             self.abc_music21.show(*args, **kwargs)
+            return None
+        except music21.converter.subConverters.SubConverterException:
+            try:
+                # Valid write formats here:
+                # https://github.com/jsundram/music21/blob/3f87658581c1c4da82f805eeab3b909479ea3f03/music21/common.py#L83  # noqa
+                image_path = self.write(fmt="lily.png")
+                ipython_shell_name = get_ipython_shell_name()
+                if ipython_shell_name:
+                    import IPython
+
+                    output = IPython.display.Image(image_path)
+                else:
+                    output = f"Image saved at {image_path}"
+                return output
+            except Exception as e:
+                exception = e
         except Exception as e:
+            exception = e
+        if exception:
             LOGGER.warning(
-                f"You probably need to install musescore, got {type(e)}:\n{e}"
+                f"You probably need to install musescore or lilypond, got {type(exception)}:\n"
+                f"{exception}"
             )
             self.abc_music21.show("text")
+
+    def write(self, *args, **kwargs):
+        return self.abc_music21.write(*args, **kwargs)
 
     def plot_pianoroll(self):
         _, subplot_axis = plt.subplots(1, 2, figsize=(12, 4), sharex=True, sharey=True)
