@@ -14,7 +14,7 @@ from double_jig_gen.tokenizers import Tokenizer
 from double_jig_gen.utils import round_to_nearest_batch_size
 
 LOGGER = logging.getLogger(__name__)
-TOKEN_SEPARATOR = ";"
+TOKEN_SEPARATOR = "§"
 
 
 def fix_encoding_errors(tune_str: str) -> str:
