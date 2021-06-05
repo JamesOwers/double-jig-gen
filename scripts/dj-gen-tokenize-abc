@@ -14,6 +14,7 @@ from double_jig_gen.data import (
 )
 from double_jig_gen.tokenizers import ABCTune, ABCTuneError
 
+logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 
 
@@ -48,7 +49,7 @@ def get_abc_tune(abc_data):
 
 
 DATA_PATH = "data/raw/folk-rnn/data_v1"
-OUTPUT_PATH = "data/working/folk-rnn/clean-folk-rnn.abc"
+OUTPUT_PATH = "data/working/folk-rnn/clean-folk-rnn.txt"
 
 
 def main(
@@ -56,7 +57,14 @@ def main(
     output_path: str = OUTPUT_PATH,
     token_separator: str = TOKEN_SEPARATOR,
     nr_tunes: Optional[int] = None,
+    log_level: Optional[str] = None,
 ):
+    if log_level is not None:
+        LOGGER.setLevel(log_level)
+    output_dir = Path(output_path).parent
+    if not output_dir.exists():
+        LOGGER.warning(f"Creating output directory {output_dir}")
+        output_dir.mkdir(parents=True, exist_ok=False)
     with open(data_path, "r") as fh:
         raw_folkrnn_data = fh.read()
     abc_data_list = raw_folkrnn_data.split("\n\n")
@@ -91,7 +99,8 @@ def main(
     tunes_as_token_strings = [
         token_separator.join(tune) for tune in tunes_as_token_lists
     ]
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    LOGGER.info(f"Writing to {output_path}")
     with open(output_path, "w") as fh:
         fh.write("\n".join(tunes_as_token_strings))
 
