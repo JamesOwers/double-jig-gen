@@ -64,7 +64,38 @@ Reading translations…
 
 ### Get data
 ```bash
-wget http://www.norbeck.nu/abc/book/oneills/1001/DoubleJig0001-0365.abc -P data/
+DATA_HOME=data
+RAW_HOME=${DATA_HOME}/raw
+WORKING_HOME=${DATA_HOME}/working
+
+scripts/dj-gen-download-folkrnn-data ${RAW_HOME}
+
+scripts/dj-gen-tokenize-abc \
+    --data-path ${RAW_HOME}/folk-rnn/data_v1 \
+    --output-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn.txt \
+    --log-level INFO
+```
+
+To make smaller datasets:
+```
+scripts/dj-gen-tokenize-abc \
+    --data-path ${RAW_HOME}/folk-rnn/data_v1 \
+    --output-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-100.txt \
+    --token-separator § \
+    --nr-tunes 100 \
+    --log-level INFO
+scripts/dj-gen-tokenize-abc \
+    --data-path ${RAW_HOME}/folk-rnn/data_v1 \
+    --output-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-1000.txt \
+    --token-separator § \
+    --nr-tunes 1000 \
+    --log-level INFO
+scripts/dj-gen-tokenize-abc \
+    --data-path ${RAW_HOME}/folk-rnn/data_v1 \
+    --output-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-10_000.txt \
+    --token-separator § \
+    --nr-tunes 10000 \
+    --log-level INFO
 ```
 
 ## Dev Setup
