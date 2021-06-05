@@ -57,7 +57,7 @@ def main(
     token_separator: str = TOKEN_SEPARATOR,
     nr_tunes: Optional[int] = None,
 ):
-    with open(DATA_PATH, "r") as fh:
+    with open(data_path, "r") as fh:
         raw_folkrnn_data = fh.read()
     abc_data_list = raw_folkrnn_data.split("\n\n")
     LOGGER.info(f"Read {len(abc_data_list)} tunes from {data_path}")
