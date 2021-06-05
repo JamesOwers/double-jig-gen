@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+"""Script to tokenise abc data."""
+import logging
+from pathlib import Path
+from typing import Optional
+
+import fire
+from tqdm import tqdm
+
+from double_jig_gen.data import (
+    TOKEN_SEPARATOR,
+    fix_encoding_errors,
+    remove_quoted_strings,
+)
+from double_jig_gen.tokenizers import ABCTune, ABCTuneError
+
+LOGGER = logging.getLogger(__name__)
+
+
+def clean_tune(tune_str):
+    return fix_encoding_errors(remove_quoted_strings(tune_str))
+
+
+def get_abc_tune(abc_data):
+    try:
+        abc_tune = ABCTune(
+            abc_data,
+            # pianoroll_divisions_per_quarternote=12,
+            # min_pitch=0,
+            # min_time=0,
+            # transpose_to_pitchclass="C",
+        )
+    except ABCTuneError as e:
+        msg = (
+            f"Not including the following tune:\n{abc_data}\n"
+            f"It raised an error when parsing with ABCTune(): {e}."
+        )
+        LOGGER.warning(msg)
+        abc_tune = msg
+    except Exception as e:
+        msg = (
+            f"Not including the following tune:\n{abc_data}\n"
+            f"It raised an unhandled error: {e}."
+        )
+        LOGGER.warning(msg)
+        abc_tune = msg
+    return abc_tune
+
+
+DATA_PATH = "data/raw/folk-rnn/data_v1"
+OUTPUT_PATH = "data/working/folk-rnn/clean-folk-rnn.abc"
+
+
+def main(
+    data_path: str = DATA_PATH,
+    output_path: str = OUTPUT_PATH,
+    token_separator: str = TOKEN_SEPARATOR,
+    nr_tunes: Optional[int] = None,
+):
+    with open(DATA_PATH, "r") as fh:
+        raw_folkrnn_data = fh.read()
+    abc_data_list = raw_folkrnn_data.split("\n\n")
+    LOGGER.info(f"Read {len(abc_data_list)} tunes from {data_path}")
+    if nr_tunes is not None:
+        abc_data_list = abc_data_list[:nr_tunes]
+    clean_abc_data = [
+        clean_tune(tune_str) for tune_str in tqdm(abc_data_list, desc="cleaning tunes")
+    ]
+    # TODO: profile this
+    tunes = [
+        get_abc_tune(abc_data)
+        for abc_data in tqdm(clean_abc_data, desc="parsing with music21")
+    ]
+    clean_tunes = [tune for tune in tunes if not isinstance(tune, str)]
+    tunes_as_token_lists = [
+        [tok.src for tok in tune._abc_handler.tokens]
+        for tune in tqdm(clean_tunes, desc="splitting into tokens")
+    ]
+    token_separator = ";"
+    token_separator_in_tune = [
+        token_separator in "".join(tune) for tune in tunes_as_token_lists
+    ]
+    if any(token_separator_in_tune):
+        tune_with_token = [
+            tune for ii, tune in enumerate(clean_tunes) if token_separator_in_tune[ii]
+        ]
+        raise ValueError(
+            f"the token separator {token_separator} is in the following tunes:"
+            f"{tune_with_token}"
+        )
+    tunes_as_token_strings = [
+        token_separator.join(tune) for tune in tunes_as_token_lists
+    ]
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as fh:
+        fh.write("\n".join(tunes_as_token_strings))
+
+
+if __name__ == "__main__":
+    fire.Fire(main)
