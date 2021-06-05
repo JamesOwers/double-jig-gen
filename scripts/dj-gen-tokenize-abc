@@ -61,6 +61,9 @@ def main(
 ):
     if log_level is not None:
         LOGGER.setLevel(log_level)
+    LOGGER.info(
+        f"Tokenizing data from {data_path} and writing to {output_path} using token separator {token_separator}"
+    )
     output_dir = Path(output_path).parent
     if not output_dir.exists():
         LOGGER.warning(f"Creating output directory {output_dir}")
@@ -70,6 +73,7 @@ def main(
     abc_data_list = raw_folkrnn_data.split("\n\n")
     LOGGER.info(f"Read {len(abc_data_list)} tunes from {data_path}")
     if nr_tunes is not None:
+        LOGGER.info(f"Restricting read to first {nr_tunes} tunes...")
         abc_data_list = abc_data_list[:nr_tunes]
     clean_abc_data = [
         clean_tune(tune_str) for tune_str in tqdm(abc_data_list, desc="cleaning tunes")
