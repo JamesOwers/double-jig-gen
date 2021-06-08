@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+"""Script to download folkrnn data, extract the vocab, and define splits."""
+import logging
+from pathlib import Path
+
+import fire
+import numpy as np
+
+from double_jig_gen.data import TOKEN_SEPARATOR
+from double_jig_gen.utils import round_to_nearest_batch_size
+
+logging.basicConfig()
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel("DEBUG")
+
+
+def get_vocab_and_make_splits(
+    data_path: str = "./data/working/folk-rnn/clean-folk-rnn.txt",
+    seed: int = 42,
+    max_tune_length: int = 500,
+    min_tune_length: int = 60,
+    test_prop: float = 0.05,
+    valid_prop: float = 0.05,
+    train_prop: float = 0.9,
+    batch_size: int = 256,
+) -> None:
+    """"""
+    assert (
+        test_prop + valid_prop + train_prop == 1
+    ), "train, valid, and test prop must sum to 1"
+    with open(data_path, "r") as fh:
+        tunes = [line.strip().split(TOKEN_SEPARATOR) for line in fh.readlines()]
+    # Save vocabulary prior to subsetting
+    LOGGER.info("Extracting vocabulary")
+    all_tokens = [token for tune in tunes for token in tune]
+    all_tokens = sorted(list(set(all_tokens)))
+    LOGGER.info(f"vocabulary size: {len(all_tokens)}")
+    LOGGER.info(
+        f"vocabulary (each token separated by a {TOKEN_SEPARATOR}): \n"
+        f"{TOKEN_SEPARATOR.join(all_tokens)}"
+    )
+    filepath = str(data_path) + "_vocabulary.txt"
+    with open(filepath, "w") as file_handle:
+        file_handle.write("\n".join(all_tokens))
+
+    LOGGER.info("Excluding very short and very long tunes")
+    tune_lens = np.array([len(t) for t in tunes])
+    is_ge_min_length = min_tune_length <= tune_lens
+    is_le_max_length = tune_lens <= max_tune_length
+    keep_tune = is_ge_min_length & is_le_max_length
+    LOGGER.info(
+        f"There are {sum(~is_ge_min_length)} tunes shorter than the minimum length "
+        f"({min_tune_length})"
+    )
+    LOGGER.info(
+        f"There are {sum(~is_le_max_length)} tunes longer than the maximum length "
+        f"({max_tune_length})"
+    )
+    LOGGER.info(f"Excluding {sum(~keep_tune)} tunes (out of {len(tunes)})")
+
+    tune_indexes = np.array([idx for idx, keep in enumerate(keep_tune) if keep])
+    nr_tunes = len(tune_indexes)
+    LOGGER.info(f"Selecting from a total of {nr_tunes} tunes")
+    LOGGER.info(
+        f"Rounding test and validation splits to nearest batch size of {batch_size}"
+    )
+    nr_test = round_to_nearest_batch_size(nr_tunes, test_prop, batch_size)
+    nr_valid = round_to_nearest_batch_size(nr_tunes, valid_prop, batch_size)
+    LOGGER.info(f"Seeding rng with value {seed} and shuffling indexes prior ot split")
+    rng = np.random.default_rng(seed)
+    rng.shuffle(tune_indexes)
+    test_idx, valid_idx, train_idx = np.split(
+        tune_indexes,
+        [nr_test, nr_test + nr_valid],
+    )
+    split_name_to_idx = {
+        "test": test_idx,
+        "valid": valid_idx,
+        "train": train_idx,
+    }
+    split_sizes = {name: len(idx) for name, idx in split_name_to_idx.items()}
+    split_proportions = {
+        name: f"{len(idx)/nr_tunes:.3f}" for name, idx in split_name_to_idx.items()
+    }
+    LOGGER.info(f"Split sizes: {split_sizes}")
+    LOGGER.info(f"Split proportions: {split_proportions}")
+    for split_name, idx in split_name_to_idx.items():
+        filepath = str(data_path) + f"_{split_name}_split.txt"
+        with open(filepath, "w") as file_handle:
+            file_handle.write("\n".join([str(ii) for ii in idx]))
+
+
+if __name__ == "__main__":
+    fire.Fire(get_vocab_and_make_splits)
