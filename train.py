@@ -115,7 +115,7 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
         "--no_progress_bars",
         default=False,
         action="store_true",
-        help="Flag to supress tqdm progress bars.",
+        help="Flag to surpress tqdm progress bars.",
     )
     new_parser.add_argument(
         "--model",
@@ -181,7 +181,9 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
     )
 
     new_parser.add_argument(
-        "--oneills_data_path", type=str, help="Location of the oneills data.",
+        "--oneills_data_path",
+        type=str,
+        help="Location of the oneills data.",
     )
 
     new_parser.add_argument(
@@ -354,7 +356,9 @@ if __name__ == "__main__":
     if args.test:
         LOGGER.info("%s Testing (not_training) %s", 30 * "=", 30 * "=")
         lightning_trainer.test(
-            model, test_dataloaders=test_dataloader, ckpt_path=None,
+            model,
+            test_dataloaders=test_dataloader,
+            ckpt_path=None,
         )
     else:
         LOGGER.info("%s Training %s", 30 * "=", 30 * "=")
