@@ -192,7 +192,7 @@ def add_user_args(parent_parser: ArgumentParser) -> ArgumentParser:
         type=float,
         help=(
             "Oneills data - proportion of the training set to use for validation, "
-            "set to 1 to use the full dataset for both training and validaiton."
+            "set to 1 to use the full dataset for both training and validation."
         ),
     )
     new_parser.add_argument(
