@@ -39,6 +39,16 @@ def remove_quoted_strings(tune_str: str) -> str:
     return tune_str
 
 
+def clean_and_standardise_token(token_str: str) -> str:
+    """"""
+    return token_str
+
+
+def standardise_key_token(token_str: str) -> str:
+    """"""
+    return token_str
+
+
 def pad_batch(batch, pad_idx):
     "Function which adds padding to each batch up to the longest sequence."
     lengths = [seq.shape[0] for seq in batch]

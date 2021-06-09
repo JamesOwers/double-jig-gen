@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Script to tokenise abc data."""
 import logging
+import os
 from functools import partial
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,7 @@ from tqdm import tqdm as std_tqdm
 
 from double_jig_gen.data import (
     TOKEN_SEPARATOR,
+    clean_and_standardise_token,
     fix_encoding_errors,
     remove_quoted_strings,
 )
@@ -95,25 +97,43 @@ def main(
             f"tunes:\n\n{tunes_with_token_separator}"
         )
     clean_abc_data = [
-        clean_tune(tune_str) for tune_str in tqdm(abc_data_list, desc="cleaning tunes")
+        (source_idx, clean_tune(tune_str))
+        for source_idx, tune_str in enumerate(
+            tqdm(abc_data_list, desc="cleaning tunes")
+        )
     ]
     # TODO: profile this
     tunes = [
-        get_abc_tune(abc_data)
-        for abc_data in tqdm(clean_abc_data, desc="parsing with music21")
+        (source_idx, get_abc_tune(abc_data))
+        for source_idx, abc_data in tqdm(clean_abc_data, desc="parsing with music21")
     ]
-    clean_tunes = [tune for tune in tunes if not isinstance(tune, str)]
+    clean_tunes = [
+        (source_idx, tune) for source_idx, tune in tunes if not isinstance(tune, str)
+    ]
     tunes_as_token_lists = [
-        [tok.src for tok in tune._abc_handler.tokens]
-        for tune in tqdm(clean_tunes, desc="splitting into tokens")
+        (
+            source_idx,
+            [clean_and_standardise_token(tok.src) for tok in tune._abc_handler.tokens],
+        )
+        for source_idx, tune in tqdm(clean_tunes, desc="splitting into tokens")
     ]
-    tunes_as_token_strings = [
-        token_separator.join(tune) for tune in tunes_as_token_lists
-    ]
+    source_idx, tunes_as_token_strings = zip(
+        *[
+            (str(source_idx), token_separator.join(tune))
+            for source_idx, tune in tunes_as_token_lists
+        ]
+    )
 
-    LOGGER.info(f"Writing to {output_path}")
+    LOGGER.info(f"Writing tokenized data to {output_path}")
     with open(output_path, "w") as fh:
         fh.write("\n".join(tunes_as_token_strings))
+    source_idx_path = f"{os.path.splitext(output_path)[0]}_source_idx.txt"
+    LOGGER.info(
+        f"Writing indices of source tunes ({data_path}) for tokenized tunes in "
+        f"{output_path} to {source_idx_path}"
+    )
+    with open(source_idx_path, "w") as fh:
+        fh.write("\n".join(source_idx))
 
 
 if __name__ == "__main__":
