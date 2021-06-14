@@ -274,32 +274,41 @@ class SimpleRNN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Calculates the loss for a training batch and logs for Tensorboard."""
         loss = self._step(batch)
-        logs = {"training_loss": loss}
-        return {"loss": loss, "log": logs}
+        self.log(
+            "training_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        return loss
 
     def validation_step(self, batch, batch_idx):
         """Calculates the loss for a validation batch."""
         loss = self._step(batch)
-        logs = {"validation_loss": loss}
-        return {"val_loss": loss, "log": logs}
-
-    def validation_epoch_end(self, outputs):
-        """Calculates the average loss for the validation at the end of the epoch."""
-        val_loss_mean = torch.stack([x["val_loss"] for x in outputs]).mean()
-        logs = {"validation_loss_mean": val_loss_mean}
-        return {"val_loss": val_loss_mean, "log": logs, "progress_bar": logs}
+        self.log(
+            "validation_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        return loss
 
     def test_step(self, batch, batch_idx):
         """Calculates the loss for the test batch."""
         loss = self._step(batch)
-        logs = {"test_loss": loss}
-        return {"test_loss": loss, "log": logs}
-
-    def test_epoch_end(self, outputs):
-        """Calculates the average loss for the test at the end of the epoch."""
-        test_loss_mean = torch.stack([x["test_loss"] for x in outputs]).mean()
-        logs = {"test_loss_mean": test_loss_mean}
-        return {"test_loss": test_loss_mean, "log": logs}
+        self.log(
+            "test_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        return loss
 
     def configure_optimizers(self):
         """Initialises the optimisers and learning rate schedulers for training."""
