@@ -76,11 +76,16 @@ def main(
         output_dir.mkdir(parents=True, exist_ok=False)
     with open(data_path, "r") as fh:
         raw_folkrnn_data = fh.read()
-    abc_data_list = raw_folkrnn_data.split("\n\n")
-    LOGGER.info(f"Read {len(abc_data_list)} tunes from {data_path}")
+    abc_data_list = [tune_str.strip() for tune_str in raw_folkrnn_data.split("\n\n")]
+    orig_nr_tunes = len(abc_data_list)
+    LOGGER.info(f"Read {orig_nr_tunes} tunes from {data_path}")
+
     if nr_tunes is not None:
         LOGGER.info(f"Restricting read to first {nr_tunes} tunes...")
         abc_data_list = abc_data_list[:nr_tunes]
+    else:
+        nr_tunes = len(abc_data_list)
+
     token_separator_in_tune = [
         token_separator in "".join(tune) for tune in abc_data_list
     ]
@@ -97,10 +102,23 @@ def main(
             f"The token separator {token_separator} is contained within the following "
             f"tunes:\n\n{tunes_with_token_separator}"
         )
+
+    LOGGER.info("Checking for duplicate tunes")
+    seen_tunes = set()
+    abc_data_with_source_idx = []
+    for source_idx, tune in enumerate(abc_data_list):
+        if tune not in seen_tunes:
+            abc_data_with_source_idx.append((source_idx, tune))
+            seen_tunes.add(tune)
+    dedup_nr_tunes = len(abc_data_with_source_idx)
+    nr_duplicate_tunes = nr_tunes - dedup_nr_tunes
+    LOGGER.info(
+        f"Removed {nr_duplicate_tunes} identical tunes, we now have {dedup_nr_tunes}"
+    )
     clean_abc_data = [
         (source_idx, clean_tune(tune_str))
-        for source_idx, tune_str in enumerate(
-            tqdm(abc_data_list, desc="cleaning tunes")
+        for source_idx, tune_str in tqdm(
+            abc_data_with_source_idx, desc="cleaning tunes"
         )
     ]
     # TODO: profile this
