@@ -29,7 +29,7 @@ def get_vocab_and_make_splits(
         test_prop + valid_prop + train_prop == 1
     ), "train, valid, and test prop must sum to 1"
     data_path = Path(data_path)
-    output_stem = str(data_path.parent + data_path.stem)
+    output_stem = str(data_path.parent) + data_path.stem
     with open(data_path, "r") as fh:
         tunes = [line.strip().split(TOKEN_SEPARATOR) for line in fh.readlines()]
     # Save vocabulary prior to subsetting
