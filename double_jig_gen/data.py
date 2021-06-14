@@ -10,7 +10,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
 from double_jig_gen.io import PATHLIKE, read_and_rstrip_file
-from double_jig_gen.tokenizers import Tokenizer
+from double_jig_gen.tokenizers import ABC_FIELDS, Tokenizer
 from double_jig_gen.utils import round_to_nearest_batch_size
 
 LOGGER = logging.getLogger(__name__)
@@ -39,13 +39,69 @@ def remove_quoted_strings(tune_str: str) -> str:
     return tune_str
 
 
+INFO_FIELD_PATTERN = re.compile(r"^[A-z]:")
+
+
 def clean_and_standardise_token(token_str: str) -> str:
-    """"""
-    return token_str
+    """Performs cleaning at a token level.
+
+    * Standardises keys
+    * Replaces info data with a standard token
+    * Removes spaces from Meter or Standard note length tokens
+    * Removes ornaments like irish rolls ~
+    """
+    if token_str.startswith("K:"):
+        return standardise_key_token(token_str)
+    if token_str.startswith("M:") or token_str.startswith("L:"):
+        return token_str.replace(" ", "")
+    if INFO_FIELD_PATTERN.match(token_str):
+        return standardise_info_token(token_str)
+    return remove_ornaments(token_str)
 
 
 def standardise_key_token(token_str: str) -> str:
     """"""
+    key_str = token_str[2:].strip()
+    replacements = {
+        r"(major)|(maj)": r"",
+        r"(minor)|(min)": r"m",
+        r"(mixolydian)|(mix)": r"Mix",
+        r"(lydian)|(lyd)": r"Lyd",
+        r"(phrygian)|(phr)": r"Phr",
+        r"(dorian)|(dor)": r"Dor",
+        r"(locrian)|(loc)": r"Loc",
+    }
+    for from_str, to_str in replacements.items():
+        key_str = re.sub(
+            pattern=from_str,
+            repl=to_str,
+            string=key_str,
+            flags=re.IGNORECASE,
+        )
+    key_str = key_str.replace(" ", "")
+    return "K:" + key_str
+
+
+def standardise_info_token(token_str: str, ignore_fields=("K", "L", "M")) -> str:
+    """"""
+    key = token_str[0]
+    if key in ignore_fields:
+        return token_str
+    replacement_value = ABC_FIELDS[key]
+    return f"{key}:{replacement_value}"
+
+
+def remove_ornaments(token_str: str) -> str:
+    replacements = {
+        r"~": r"",
+    }
+    for from_str, to_str in replacements.items():
+        token_str = re.sub(
+            pattern=from_str,
+            repl=to_str,
+            string=token_str,
+            flags=re.IGNORECASE,
+        )
     return token_str
 
 
