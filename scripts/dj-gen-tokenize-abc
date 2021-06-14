@@ -67,7 +67,8 @@ def main(
     if log_level is not None:
         LOGGER.setLevel(log_level)
     LOGGER.info(
-        f"Tokenizing data from {data_path} and writing to {output_path} using token separator {token_separator}"
+        f"Tokenizing data from {data_path} and writing to {output_path} using token "
+        f"separator {token_separator}"
     )
     output_dir = Path(output_path).parent
     if not output_dir.exists():
