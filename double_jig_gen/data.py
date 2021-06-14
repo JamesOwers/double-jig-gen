@@ -87,8 +87,15 @@ def standardise_info_token(token_str: str, ignore_fields=("K", "L", "M")) -> str
     key = token_str[0]
     if key in ignore_fields:
         return token_str
-    replacement_value = ABC_FIELDS[key]
-    return f"{key}:{replacement_value}"
+    try:
+        replacement_value = ABC_FIELDS[key]
+        return f"{key}:{replacement_value}"
+    except KeyError:
+        LOGGER.warning(
+            f"{token_str} starts with {key} which is not known metadata. Returning the "
+            "string as is."
+        )
+        return token_str
 
 
 def remove_ornaments(token_str: str) -> str:
