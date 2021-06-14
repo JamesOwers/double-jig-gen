@@ -98,6 +98,21 @@ scripts/dj-gen-tokenize-abc \
     --log-level INFO
 ```
 
+## Create the experimental splits
+```bash
+DATA_HOME=data
+WORKING_HOME=${DATA_HOME}/working
+dj-gen-get-vocab-and-make-splits \
+    --data-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn.txt \
+    --seed 42 \
+    --max_tune_length 500 \
+    --min_tune_length 60 \
+    --test_prop 0.05 \
+    --valid_prop 0.05 \
+    --train_prop 0.9 \
+    --batch_size 256
+```
+
 ## Dev Setup
 Install pre-commit hooks to automatically check code with isort, black, and flake8.
 
