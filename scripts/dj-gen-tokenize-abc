@@ -152,8 +152,8 @@ def main(
     ]
 
     LOGGER.info(
-        "Dropping tunes with rare tokens i.e. tokens which only appear a few times in "
-        "the whole corpus"
+        "Dropping tunes with rare tokens i.e. tokens which appear less than "
+        f"{minimum_token_frequency} times in the whole corpus"
     )
     nr_tunes_before = len(tunes_as_token_lists)
     token_counts = pd.Series(
@@ -167,7 +167,7 @@ def main(
         for source_idx, tune in tqdm(
             tunes_as_token_lists, desc="removing tunes with rare tokens"
         )
-        if any(token in removed_tokens for token in tune)
+        if all(token not in removed_tokens for token in tune)
     ]
     nr_removed_tunes = nr_tunes_before - len(tunes_as_token_lists)
     LOGGER.info(
