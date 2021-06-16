@@ -116,7 +116,7 @@ def make_shorthand_longhand(token_str: str) -> str:
     for nr_slashes in [2, 1]:
         search_str = "/" * nr_slashes
         if token_str.endswith(search_str):
-            return token_str + f"{2 ** nr_slashes}"
+            return token_str[:-nr_slashes] + f"/{2 ** nr_slashes}"
     return token_str
 
 
