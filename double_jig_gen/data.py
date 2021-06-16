@@ -56,7 +56,7 @@ def clean_and_standardise_token(token_str: str) -> str:
         return token_str.replace(" ", "")
     if INFO_FIELD_PATTERN.match(token_str):
         return standardise_info_token(token_str)
-    return remove_ornaments(token_str)
+    return make_shorthand_longhand(remove_ornaments(token_str))
 
 
 def standardise_key_token(token_str: str) -> str:
@@ -100,7 +100,7 @@ def standardise_info_token(token_str: str, ignore_fields=("K", "L", "M")) -> str
 
 def remove_ornaments(token_str: str) -> str:
     replacements = {
-        r"~": r"",
+        r"~": "",  # trills
     }
     for from_str, to_str in replacements.items():
         token_str = re.sub(
@@ -110,6 +110,13 @@ def remove_ornaments(token_str: str) -> str:
             flags=re.IGNORECASE,
         )
     return token_str
+
+
+def make_shorthand_longhand(token_str: str) -> str:
+    for nr_slashes in [2, 1]:
+        search_str = "/" * nr_slashes
+        if token_str.endswith(search_str):
+            return token_str + f"{2 ** nr_slashes}"
 
 
 def pad_batch(batch, pad_idx):
