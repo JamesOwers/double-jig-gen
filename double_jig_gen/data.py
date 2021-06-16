@@ -117,6 +117,7 @@ def make_shorthand_longhand(token_str: str) -> str:
         search_str = "/" * nr_slashes
         if token_str.endswith(search_str):
             return token_str + f"{2 ** nr_slashes}"
+    return token_str
 
 
 def pad_batch(batch, pad_idx):
