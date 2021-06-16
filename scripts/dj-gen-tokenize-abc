@@ -157,11 +157,7 @@ def main(
     )
     nr_tunes_before = len(tunes_as_token_lists)
     token_counts = pd.Series(
-        [
-            tok
-            for tune in tunes  # Note that we're only tokenizing the training data
-            for tok in tune
-        ]
+        [tok for _, tune in tunes_as_token_lists for tok in tune]
     ).value_counts()
     is_removed = token_counts < minimum_token_frequency
     removed_tokens = token_counts[is_removed].index
@@ -171,7 +167,7 @@ def main(
         for source_idx, tune in tqdm(
             tunes_as_token_lists, desc="removing tunes with rare tokens"
         )
-        if not any(token in removed_tokens for token in tune)
+        if any(token in removed_tokens for token in tune)
     ]
     nr_removed_tunes = nr_tunes_before - len(tunes_as_token_lists)
     LOGGER.info(
