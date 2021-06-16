@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import fire
+import pandas as pd
 from tqdm import tqdm as std_tqdm
 
 from double_jig_gen.data import (
@@ -23,7 +24,7 @@ LOGGER = logging.getLogger(__name__)
 tqdm = partial(std_tqdm, dynamic_ncols=True)
 
 
-def clean_tune(tune_str):
+def clean_tune_str(tune_str):
     return fix_encoding_errors(remove_quoted_strings(tune_str))
 
 
@@ -62,6 +63,10 @@ def main(
     output_path: str = OUTPUT_PATH,
     token_separator: str = TOKEN_SEPARATOR,
     nr_tunes: Optional[int] = None,
+    # TODO: reduce this number to zero and clean duff tokens manually (it's currently )
+    # partially used to get count = 1 tokens which are just crap (i.e. music21 parse
+    # errors) but there are many legitimate count = 1 tokens e.g. chords, accents, etc.
+    minimum_token_frequency: Optional[int] = 2,
     log_level: Optional[str] = None,
 ):
     if log_level is not None:
@@ -115,13 +120,20 @@ def main(
     LOGGER.info(
         f"Removed {nr_duplicate_tunes} identical tunes, we now have {dedup_nr_tunes}"
     )
+
+    LOGGER.info(
+        "Cleaning the text strings representing the tunes e.g. fixing encoding errors "
+        "and removing double quoted text comments."
+    )
     clean_abc_data = [
-        (source_idx, clean_tune(tune_str))
+        (source_idx, clean_tune_str(tune_str))
         for source_idx, tune_str in tqdm(
             abc_data_with_source_idx, desc="cleaning tunes"
         )
     ]
+
     # TODO: profile this
+    LOGGER.info("Splitting into tokens using music21 (drop tunes which cant be parsed)")
     tunes = [
         (source_idx, get_abc_tune(abc_data))
         for source_idx, abc_data in tqdm(clean_abc_data, desc="parsing with music21")
@@ -129,6 +141,8 @@ def main(
     clean_tunes = [
         (source_idx, tune) for source_idx, tune in tunes if not isinstance(tune, str)
     ]
+
+    LOGGER.info("Cleaning individual tokens")
     tunes_as_token_lists = [
         (
             source_idx,
@@ -136,20 +150,48 @@ def main(
         )
         for source_idx, tune in tqdm(clean_tunes, desc="splitting into tokens")
     ]
+
+    LOGGER.info(
+        "Dropping tunes with rare tokens i.e. tokens which only appear a few times in "
+        "the whole corpus"
+    )
+    nr_tunes_before = len(tunes_as_token_lists)
+    token_counts = pd.Series(
+        [
+            tok
+            for tune in tunes  # Note that we're only tokenizing the training data
+            for tok in tune
+        ]
+    ).value_counts()
+    is_removed = token_counts < minimum_token_frequency
+    removed_tokens = token_counts[is_removed].index
+    nr_removed_tokens = sum(is_removed)
+    tunes_as_token_lists = [
+        (source_idx, tune)
+        for source_idx, tune in tqdm(
+            tunes_as_token_lists, desc="removing tunes with rare tokens"
+        )
+        if not any(token in removed_tokens for token in tune)
+    ]
+    nr_removed_tunes = nr_tunes_before - len(tunes_as_token_lists)
+    LOGGER.info(
+        f"Removed {nr_removed_tokens} tokens and the {nr_removed_tunes} tunes which "
+        "used them."
+    )
+
+    LOGGER.info(f"Writing tokenized data to {output_path}")
     source_idx, tunes_as_token_strings = zip(
         *[
             (str(source_idx), token_separator.join(tune))
             for source_idx, tune in tunes_as_token_lists
         ]
     )
-
-    LOGGER.info(f"Writing tokenized data to {output_path}")
     with open(output_path, "w") as fh:
         fh.write("\n".join(tunes_as_token_strings))
     source_idx_path = f"{os.path.splitext(output_path)[0]}_source_idx.txt"
     LOGGER.info(
-        f"Writing indices of source tunes ({data_path}) for tokenized tunes in "
-        f"{output_path} to {source_idx_path}"
+        "Writing indices of source tunes (i.e. tune index number for tunes in "
+        f"{data_path}) for tokenized tunes {output_path} to {source_idx_path}"
     )
     with open(source_idx_path, "w") as fh:
         fh.write("\n".join(source_idx))
