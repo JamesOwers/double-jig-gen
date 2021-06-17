@@ -113,6 +113,37 @@ dj-gen-get-vocab-and-make-splits \
     --batch_size 256
 ```
 
+For smaller datasets:
+```
+dj-gen-get-vocab-and-make-splits \
+    --data-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-100.txt \
+    --seed 42 \
+    --max_tune_length 500 \
+    --min_tune_length 60 \
+    --test_prop 0.05 \
+    --valid_prop 0.05 \
+    --train_prop 0.9 \
+    --batch_size 256
+dj-gen-get-vocab-and-make-splits \
+    --data-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-1000.txt \
+    --seed 42 \
+    --max_tune_length 500 \
+    --min_tune_length 60 \
+    --test_prop 0.05 \
+    --valid_prop 0.05 \
+    --train_prop 0.9 \
+    --batch_size 256
+dj-gen-get-vocab-and-make-splits \
+    --data-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn-10_000.txt \
+    --seed 42 \
+    --max_tune_length 500 \
+    --min_tune_length 60 \
+    --test_prop 0.05 \
+    --valid_prop 0.05 \
+    --train_prop 0.9 \
+    --batch_size 256
+```
+
 ## Dev Setup
 Install pre-commit hooks to automatically check code with isort, black, and flake8.
 
