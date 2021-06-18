@@ -315,7 +315,13 @@ class SimpleRNN(pl.LightningModule):
         if self.scheduler is None:
             return self.optimizer
         else:
-            return [self.optimizer], [self.scheduler]
+            return {
+                "optimizer": self.optimizer,
+                "lr_scheduler": {
+                    "scheduler": self.scheduler,
+                    "monitor": "val_loss",
+                },
+            }
 
     def generate_next_token(
         self,

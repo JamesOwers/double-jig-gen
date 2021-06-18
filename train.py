@@ -293,11 +293,11 @@ if __name__ == "__main__":
             gpus=args.gpus,
             max_epochs=args.max_epochs,
             deterministic=True,
-            early_stop_callback=early_stop_callback,
+            callbacks=early_stop_callback,
         )
     else:
         lightning_trainer = pl.Trainer.from_argparse_args(
-            args, deterministic=True, early_stop_callback=early_stop_callback
+            args, deterministic=True, callbacks=early_stop_callback
         )
 
     LOGGER.info(f"Loading '{args.dataset}' dataset and getting dataloaders")

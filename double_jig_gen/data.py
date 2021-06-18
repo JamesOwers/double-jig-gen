@@ -1,5 +1,6 @@
 """Dataset preprocessing and item getting classes."""
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Callable, Collection, List, Optional, Sequence, Tuple, Union
@@ -9,7 +10,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
-from double_jig_gen.io import PATHLIKE, read_and_rstrip_file
+from double_jig_gen.io import read_and_rstrip_file
 from double_jig_gen.tokenizers import ABC_FIELDS, Tokenizer
 from double_jig_gen.utils import round_to_nearest_batch_size
 
@@ -145,7 +146,7 @@ class ABCDataset:
 
     def __init__(
         self,
-        filepath: Optional[PATHLIKE] = None,
+        filepath: Optional[os.PathLike] = None,
         tunes: Optional[List[str]] = None,
         tokens: Optional[Collection[str]] = None,
         subset: Optional[Collection[int]] = None,
@@ -160,10 +161,13 @@ class ABCDataset:
         if tunes is None:
             self._filepath = filepath
             self.data = read_and_rstrip_file(filepath)
+            # self.tunes = [
+            #     tune.split()
+            #     for tune in re.split(r"\n{2,}", self.data)
+            #     if not (tune.startswith("%") or tune == "")
+            # ]
             self.tunes = [
-                tune.split()
-                for tune in re.split(r"\n{2,}", self.data)
-                if not (tune.startswith("%") or tune == "")
+                line.strip().split(TOKEN_SEPARATOR) for line in self.data.split("\n")
             ]
         else:
             self.tunes = tunes
@@ -221,27 +225,31 @@ class FolkRNNDataset(ABCDataset):
 
     def __init__(
         self,
-        filepath: PATHLIKE,
-        subset_name: Optional[str] = None,
+        file_path: os.PathLike,
+        vocab_path: Optional[os.PathLike] = None,
+        subset_path: Optional[os.PathLike] = None,
     ) -> None:
-        filepath = Path(filepath).resolve()
-        with open(f"{str(filepath)}_vocabulary.txt", "r") as file_handle:
-            tokens = file_handle.read().splitlines()
-        if subset_name is not None:
-            with open(f"{str(filepath)}_{subset_name}_split.txt", "r") as file_handle:
+        file_path = Path(file_path).resolve()
+        if vocab_path is not None:
+            with open(vocab_path, "r") as file_handle:
+                tokens = file_handle.read().splitlines()
+        else:
+            tokens = None
+        if subset_path is not None:
+            with open(subset_path, "r") as file_handle:
                 subset_indices = [int(idx) for idx in file_handle.read().splitlines()]
         else:
             subset_indices = None
 
         super().__init__(
-            filepath=filepath,
+            filepath=file_path,
             tokens=tokens,
             subset=subset_indices,
         )
 
 
 def get_folkrnn_dataloaders(
-    filepath: PATHLIKE,
+    filepath: os.PathLike,
     batch_size: int,
     num_workers: int,
     pin_memory: bool,
@@ -257,12 +265,20 @@ def get_folkrnn_dataloaders(
         train_dataloader, validation_dataloader, test_dataloader: Dataloader classes.
     """
     LOGGER.info("Loading folkrnn train dataset")
-    train_dataset = FolkRNNDataset(filepath=filepath, subset_name="train")
+    file_path = Path(filepath)
+    file_stem = Path(file_path.parent, file_path.stem)
+    vocab_path = f"{str(file_stem)}_vocabulary.txt"
+    subset_path = f"{str(file_stem)}_{{subset_name}}_split.txt"
+    train_dataset = FolkRNNDataset(
+        file_path=filepath,
+        vocab_path=vocab_path,
+        subset_path=subset_path.format(subset_name="train"),
+    )
     pad_idx = train_dataset.tokenizer.pad_token_index
     LOGGER.info(f"Padding token index read as {pad_idx}")
 
-    def pad_folkrnn_batch(batch):
-        return pad_batch(batch, pad_idx=pad_idx)
+    if pad_idx != 0:
+        raise ValueError("Padding index must be zero")
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -270,34 +286,42 @@ def get_folkrnn_dataloaders(
         shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_folkrnn_batch,
+        collate_fn=default_pad_batch,
     )
     LOGGER.info("Loading folkrnn validation dataset")
-    val_dataset = FolkRNNDataset(filepath=filepath, subset_name="valid")
+    val_dataset = FolkRNNDataset(
+        file_path=filepath,
+        vocab_path=vocab_path,
+        subset_path=subset_path.format(subset_name="valid"),
+    )
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_folkrnn_batch,
+        collate_fn=default_pad_batch,
     )
     LOGGER.info("Loading folkrnn test dataset")
-    test_dataset = FolkRNNDataset(filepath=filepath, subset_name="test")
+    test_dataset = FolkRNNDataset(
+        file_path=filepath,
+        vocab_path=vocab_path,
+        subset_path=subset_path.format(subset_name="test"),
+    )
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=pad_folkrnn_batch,
+        collate_fn=default_pad_batch,
     )
     return train_dataloader, val_dataloader, test_dataloader
 
 
 def get_oneills_dataloaders(
-    filepath: PATHLIKE,
-    folkrnn_vocab_filepath: PATHLIKE,
+    filepath: os.PathLike,
+    folkrnn_vocab_filepath: os.PathLike,
     batch_size: int,
     num_workers: int,
     pin_memory: bool,
