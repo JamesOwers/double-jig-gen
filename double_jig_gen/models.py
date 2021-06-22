@@ -319,7 +319,7 @@ class SimpleRNN(pl.LightningModule):
                 "optimizer": self.optimizer,
                 "lr_scheduler": {
                     "scheduler": self.scheduler,
-                    "monitor": "val_loss",
+                    "monitor": "validation_loss",
                 },
             }
 
