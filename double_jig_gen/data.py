@@ -274,6 +274,7 @@ def get_folkrnn_dataloaders(
         vocab_path=vocab_path,
         subset_path=subset_path.format(subset_name="train"),
     )
+    LOGGER.info(f"{len(train_dataset)=}")
     pad_idx = train_dataset.tokenizer.pad_token_index
     LOGGER.info(f"Padding token index read as {pad_idx}")
 
@@ -294,6 +295,7 @@ def get_folkrnn_dataloaders(
         vocab_path=vocab_path,
         subset_path=subset_path.format(subset_name="valid"),
     )
+    LOGGER.info(f"{len(val_dataset)=}")
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=batch_size,
@@ -308,6 +310,7 @@ def get_folkrnn_dataloaders(
         vocab_path=vocab_path,
         subset_path=subset_path.format(subset_name="test"),
     )
+    LOGGER.info(f"{len(test_dataset)=}")
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
