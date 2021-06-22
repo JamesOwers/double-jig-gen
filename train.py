@@ -280,7 +280,7 @@ if __name__ == "__main__":
     )
 
     early_stop_callback = pl.callbacks.EarlyStopping(
-        monitor="val_loss",
+        monitor="validation_loss_epoch",
         min_delta=0.00,
         patience=args.early_stopping_patience,
         verbose=True,
