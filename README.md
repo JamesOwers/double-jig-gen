@@ -64,7 +64,7 @@ Reading translations…
 
 ### Get data
 ```bash
-DATA_HOME=data
+DATA_HOME=/disk/scratch_ssd/s0816700/data
 RAW_HOME=${DATA_HOME}/raw
 WORKING_HOME=${DATA_HOME}/working
 
@@ -73,6 +73,11 @@ scripts/dj-gen-download-folkrnn-data ${RAW_HOME}
 scripts/dj-gen-tokenize-abc \
     --data-path ${RAW_HOME}/folk-rnn/data_v1 \
     --output-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn.txt \
+    --log-level INFO
+
+scripts/dj-gen-tokenize-abc \
+    --data-path "${WORKING_HOME}/thesession.org/all_tunes.abc" \
+    --output-path "${WORKING_HOME}/thesession.org/tokenized_tunes.txt" \
     --log-level INFO
 ```
 
@@ -104,6 +109,15 @@ DATA_HOME=data
 WORKING_HOME=${DATA_HOME}/working
 dj-gen-get-vocab-and-make-splits \
     --data-path ${WORKING_HOME}/folk-rnn/clean-folk-rnn.txt \
+    --seed 42 \
+    --max_tune_length 500 \
+    --min_tune_length 60 \
+    --test_prop 0.05 \
+    --valid_prop 0.05 \
+    --train_prop 0.9 \
+    --batch_size 256
+dj-gen-get-vocab-and-make-splits \
+    --data-path ${WORKING_HOME}/thesession.org/tokenized_tunes.txt \
     --seed 42 \
     --max_tune_length 500 \
     --min_tune_length 60 \

@@ -16,3 +16,44 @@
     --ninp 32 \
     --nhid 128 \
     --dropout 0.0
+
+# Full data!
+./train.py \
+    --gpus '1,' \
+    --batch_size 512 \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset folkrnn \
+    --folkrnn_data_path /disk/scratch_ssd/s0816700/data/working/thesession.org/tokenized_tunes.txt \
+    --default_root_dir /disk/scratch_ssd/s0816700/logs \
+    --ninp 64 \
+    --nhid 128 \
+    --dropout 0.1
+
+./train.py \
+    --gpus '2,' \
+    --batch_size 256 \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset folkrnn \
+    --folkrnn_data_path /disk/scratch_ssd/s0816700/data/working/thesession.org/tokenized_tunes.txt \
+    --default_root_dir /disk/scratch_ssd/s0816700/logs \
+    --ninp 64 \
+    --nhid 128 \
+    --dropout 0.1
+
+# Full data!
+./train.py \
+    --gpus '3,' \
+    --batch_size 128 \
+    --num_workers 8 \
+    --model rnn \
+    --rnn_type LSTM \
+    --dataset folkrnn \
+    --folkrnn_data_path /disk/scratch_ssd/s0816700/data/working/thesession.org/tokenized_tunes.txt \
+    --default_root_dir /disk/scratch_ssd/s0816700/logs \
+    --ninp 64 \
+    --nhid 128 \
+    --dropout 0.1
