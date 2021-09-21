@@ -1,0 +1,87 @@
+import sys
+import time
+from pathlib import Path
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from tqdm import tqdm
+
+basepath = Path("data", "raw", "thesession.org")
+basepath.mkdir(exist_ok=True, parents=True)
+
+if len(sys.argv) > 1:
+    first_tune_nr = int(sys.argv[1])
+else:
+    first_tune_nr = 1
+
+if len(sys.argv) > 2:
+    max_tunes = int(sys.argv[2])
+else:
+    max_tunes = 25_000
+
+max_requests_per_second = 20
+wait_time = 1 / max_requests_per_second
+print(f"Could take {(max_tunes * wait_time)/60/60} hours")
+
+print(f"starting from tune {first_tune_nr}")
+for tune_nr in tqdm(range(first_tune_nr, max_tunes + 1)):
+    path = basepath / Path(f"{tune_nr:06}.abc")
+    # this format *normally* returns a page which contains all tunes, but doesn't always
+    # url = f"https://thesession.org/tunes/{tune_nr}/abc/1000"
+    url = f"https://thesession.org/tunes/{tune_nr}"
+    page = requests.get(url, allow_redirects=True)
+    soup = BeautifulSoup(page.content, "html.parser")
+    level1_headings = soup.h1
+    if level1_headings is None:
+        level1_headings_contents = []
+    else:
+        level1_headings_contents = level1_headings.contents
+    if not any(code in level1_headings_contents for code in ["404", "410"]):
+        with open(path, "w") as file_handle:
+            #  file_handle.write(page.text)  # if using */abc/1000 url, this worked
+            tune_tags = soup.find_all("div", {"class": "notes"})
+            text = "\n\n".join(
+                "".join(tune_string.replace("\r", "\n") for tune_string in tag.strings)
+                .replace("\n\n", "\n")
+                .strip()
+                for tag in tune_tags
+            )
+            file_handle.write(text)
+        time.sleep(wait_time)
+
+abc_tunes = {}
+issue_tunes = {}
+for abc_file in tqdm([filepath for filepath in basepath.iterdir() if filepath.suffix == ".abc"]):
+    tune_number = int(abc_file.stem)
+    with open(abc_file, "r") as fh:
+        file_content = fh.read().strip()
+        if file_content.startswith("<"):
+            issue_tunes[tune_number] = file_content
+        else:
+            tunes = {
+                (tune_number, setting_number + 1): tune.strip()
+                for setting_number, tune
+                in enumerate(file_content.split("\n\n"))
+            }
+    abc_tunes.update(tunes)
+
+if issue_tunes:
+    print("Some tunes didn't download properly:")
+    print(issue_tunes)
+
+tunes_df = pd.DataFrame(
+    abc_tunes.values(),
+    index=pd.MultiIndex.from_tuples(
+        abc_tunes.keys(), names=["tune_number", "setting_number"]
+    ),
+    columns=["tune_str"],
+).sort_index()
+print(tunes_df)
+
+outdir = Path("data", "working", "thesession.org")
+outdir.mkdir(exist_ok=True, parents=True)
+tunes_df.to_csv(outdir / Path("all_tunes.csv"))
+
+with open(outdir / Path("all_tunes.abc"), "w") as fh:
+    fh.write("\n\n".join(tunes_df["tune_str"].squeeze()))
