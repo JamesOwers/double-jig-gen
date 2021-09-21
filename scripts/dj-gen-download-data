@@ -2,15 +2,24 @@
 
 REPO_HOME="${HOME}/git/double-jig-gen"
 data_home="${1:-${REPO_HOME}/data/raw}"
-folkrnn_data_dir="${data_home}/folk-rnn"
-mkdir -p ${folkrnn_data_dir}
 
+thesession_data_dir="${data_home}/thesession.org"
+mkdir -p ${thesession_data_dir}
+data_url="https://www.dropbox.com/s/49rz99k457nceke/all_tunes.abc?dl=1"
+curl -L -o ${thesession_data_dir}/all_tunes.abc ${data_url}
+data_url="https://www.dropbox.com/s/2l4lvfthh28zfv5/all_tunes.csv?dl=1"
+curl -L -o ${thesession_data_dir}/all_tunes.csv ${data_url}
+
+oneills_data_dir="${data_home}/oneills"
+mkdir -p ${oneills_data_dir}
 oneills_url="http://www.norbeck.nu/abc/book/oneills/1001/DoubleJig0001-0365.abc"
-printf "Downloading ${oneills_url} to ${data_home}\n"
+printf "Downloading ${oneills_url} to ${oneills_data_dir}\n"
 # wget ${oneills_url} -P "${data_home}/"
 # N.B. Brackets start a subshell, we return to cwd after closing brace
-(cd ${data_home} && curl -O ${oneills_url})
+(cd ${oneills_data_dir} && curl -O ${oneills_url})
 
+folkrnn_data_dir="${data_home}/folk-rnn"
+mkdir -p ${folkrnn_data_dir}
 folkrnn_data_url="https://raw.githubusercontent.com/IraKorshunova/folk-rnn/master/data"
 folkrnn_filenames=(
     "data_v1"
