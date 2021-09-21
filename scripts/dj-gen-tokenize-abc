@@ -29,33 +29,42 @@ def clean_tune_str(tune_str):
 
 
 def get_abc_tune(abc_data):
-    try:
-        abc_tune = ABCTune(
-            abc_data,
-            # pianoroll_divisions_per_quarternote=12,
-            # min_pitch=0,
-            # min_time=0,
-            # transpose_to_pitchclass="C",
-        )
-    except ABCTuneError as e:
-        msg = (
-            f"Not including the following tune:\n{abc_data}\n"
-            f"It raised an error when parsing with ABCTune(): {e}."
-        )
-        LOGGER.warning(msg)
-        abc_tune = msg
-    except Exception as e:
-        msg = (
-            f"Not including the following tune:\n{abc_data}\n"
-            f"It raised an unhandled error: {e}."
-        )
+    trying = True
+    success = False
+    while trying:
+        try:
+            abc_tune = ABCTune(
+                abc_data,
+                # pianoroll_divisions_per_quarternote=12,
+                # min_pitch=0,
+                # min_time=0,
+                # transpose_to_pitchclass="C",
+            )
+            success = True
+            trying = False
+        except ABCTuneError as e:
+            if "Could not get pitch information from note:  J" in str(e):
+                abc_data = abc_data.replace("J", r":slide:")
+            else:
+                trying = False
+                msg = (
+                    f"Not including the following tune:\n{abc_data}\n"
+                    f"It raised an error when parsing with ABCTune(): {e}."
+                )
+        except Exception as e:
+            trying = False
+            msg = (
+                f"Not including the following tune:\n{abc_data}\n"
+                f"It raised an unhandled error: {e}."
+            )
+    if not success:
         LOGGER.warning(msg)
         abc_tune = msg
     return abc_tune
 
 
-DATA_PATH = "data/raw/folk-rnn/data_v1"
-OUTPUT_PATH = "data/working/folk-rnn/clean-folk-rnn.txt"
+DATA_PATH = "data/raw/thesession.org/all_tunes.abc"
+OUTPUT_PATH = "data/working/thesession.org/tokenized_tunes.abc"
 
 
 def main(
@@ -80,8 +89,8 @@ def main(
         LOGGER.warning(f"Creating output directory {output_dir}")
         output_dir.mkdir(parents=True, exist_ok=False)
     with open(data_path, "r") as fh:
-        raw_folkrnn_data = fh.read()
-    abc_data_list = [tune_str.strip() for tune_str in raw_folkrnn_data.split("\n\n")]
+        raw_abc_data = fh.read()
+    abc_data_list = [tune_str.strip() for tune_str in raw_abc_data.split("\n\n")]
     orig_nr_tunes = len(abc_data_list)
     LOGGER.info(f"Read {orig_nr_tunes} tunes from {data_path}")
 
