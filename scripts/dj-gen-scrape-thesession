@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-basepath = Path("data", "raw", "thesession.org")
+basepath = Path("data", "raw", "website_scrapes", "thesession.org")
 basepath.mkdir(exist_ok=True, parents=True)
 
 if len(sys.argv) > 1:
@@ -79,7 +79,7 @@ tunes_df = pd.DataFrame(
 ).sort_index()
 print(tunes_df)
 
-outdir = Path("data", "working", "thesession.org")
+outdir = Path("data", "raw", "thesession.org")
 outdir.mkdir(exist_ok=True, parents=True)
 tunes_df.to_csv(outdir / Path("all_tunes.csv"))
 
