@@ -102,7 +102,6 @@ def standardise_info_token(token_str: str, ignore_fields=("K", "L", "M")) -> str
 def remove_ornaments(token_str: str) -> str:
     replacements = {
         r"~": "",  # trills
-        "J": r":slide:",  # slide
     }
     for from_str, to_str in replacements.items():
         token_str = re.sub(
